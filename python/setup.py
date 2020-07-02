@@ -34,10 +34,10 @@ with open(os.path.join(include_folder, 'common.h'), 'r') as v_file:
             break
 
 classy_ext = Extension("classy", [os.path.join(classy_folder, "classy.pyx")],
-                           include_dirs=[nm.get_include(), include_folder, "/usr/local/opt/openblas/include"],
+                           include_dirs=[nm.get_include(), include_folder, "/Users/rmurgia/Desktop/OpenBLAS/include"],
                            libraries=liblist,
                            library_dirs=[root_folder, GCCPATH],
-                           extra_link_args=['/usr/local/opt/openblas/lib/libopenblas.a','-lgomp','-lgsl','-lgslcblas','-Wl,-rpath,/usr/local/opt/gcc/lib/gcc/9/'])
+                           extra_link_args=['/Users/rmurgia/Desktop/OpenBLAS/lib/libopenblas.a','-lgomp','-lgsl','-lgslcblas','-Wl,-rpath,/usr/local/opt/gcc/lib/gcc/9/'])
 
 import six
 classy_ext.cython_directives = {'language_level': "3" if six.PY3 else "2"}

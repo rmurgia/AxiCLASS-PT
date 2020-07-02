@@ -47,7 +47,7 @@ CCFLAG = -g -fPIC -ggdb3
 LDFLAG = -g -fPIC
 
 #put your path to libopenblas.a here
-OPENBLAS = /usr/local/opt/openblas/lib/libopenblas.a
+OPENBLAS = /Users/rmurgia/Desktop/OpenBLAS/lib/libopenblas.a
 
 #GSL FLAGS
 #GSLFLAG += -lgsl -lgslcblas -lm
