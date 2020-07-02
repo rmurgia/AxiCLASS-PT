@@ -55,7 +55,7 @@ OPENBLAS = /Users/rmurgia/Desktop/OpenBLAS/lib/libopenblas.a
 # (with no slash at the end: e.g. hyrec or ../hyrec)
 HYREC = hyrec
 
-GSL_LIB = /opt/local/lib/
+GSL_LIB = /usr/local/lib/
 CC++ = g++-mp-6
 
 ########################################################
@@ -142,8 +142,6 @@ TEST_TRANSFER = test_transfer.o
 
 TEST_NONLINEAR = test_nonlinear.o
 
-TEST_NONLINEAR_PT = test_nonlinear_pt.o
-
 TEST_PERTURBATIONS = test_perturbations.o
 
 TEST_THERMODYNAMICS = test_thermodynamics.o
@@ -158,7 +156,7 @@ TEST_STEPHANE = test_stephane.o
 
 C_TOOLS =  $(addprefix tools/, $(addsuffix .c,$(basename $(TOOLS))))
 C_SOURCE = $(addprefix source/, $(addsuffix .c,$(basename $(SOURCE) $(OUTPUT))))
-C_TEST = $(addprefix test/, $(addsuffix .c,$(basename $(TEST_DEGENERACY) $(TEST_LOOPS) $(TEST_TRANSFER) $(TEST_NONLINEAR) $(TEST_NONLINEAR_PT) $(TEST_PERTURBATIONS) $(TEST_THERMODYNAMICS))))
+C_TEST = $(addprefix test/, $(addsuffix .c,$(basename $(TEST_DEGENERACY) $(TEST_LOOPS) $(TEST_TRANSFER) $(TEST_NONLINEAR) $(TEST_PERTURBATIONS) $(TEST_THERMODYNAMICS))))
 C_MAIN = $(addprefix main/, $(addsuffix .c,$(basename $(CLASS))))
 C_ALL = $(C_MAIN) $(C_TOOLS) $(C_SOURCE)
 H_ALL = $(addprefix include/, common.h svnversion.h $(addsuffix .h, $(basename $(notdir $(C_ALL)))))
@@ -197,9 +195,6 @@ test_transfer: $(TOOLS) $(SOURCE) $(EXTERNAL) $(TEST_TRANSFER)
 	$(CC) $(OPTFLAG) $(OMPFLAG) $(LDFLAG) -o  $@ $(addprefix build/,$(notdir $^)) -lm
 
 test_nonlinear: $(TOOLS) $(SOURCE) $(EXTERNAL) $(TEST_NONLINEAR)
-	$(CC) $(OPTFLAG) $(OMPFLAG) $(LDFLAG) -o  $@ $(addprefix build/,$(notdir $^)) -lm
-
-test_nonlinear_pt: $(TOOLS) $(SOURCE) $(EXTERNAL) $(TEST_NONLINEAR_PT)
 	$(CC) $(OPTFLAG) $(OMPFLAG) $(LDFLAG) -o  $@ $(addprefix build/,$(notdir $^)) -lm
 
 test_perturbations: $(TOOLS) $(SOURCE) $(EXTERNAL) $(TEST_PERTURBATIONS)
