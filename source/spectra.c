@@ -264,16 +264,23 @@ int spectra_init(
                  struct background * pba,
                  struct perturbs * ppt,
                  struct primordial * ppm,
-                 struct nonlinear * pnl,
+                 struct nonlinear_pt *pnlpt,
+                 struct nonlinear *pnl,
                  struct transfers * ptr,
                  struct spectra * psp
                  ) {
 
   /** Summary: */
 
+  double TT_II,TT_RI,TT_RR;
+  int l1,l2;
+
   /** - check that we really want to compute at least one spectrum */
 
-  if (ppt->has_cls == _FALSE_) {
+  if ((ppt->has_cls == _FALSE_) &&
+      (ppt->has_pk_matter == _FALSE_) &&
+      (ppt->has_density_transfers == _FALSE_) &&
+      (ppt->has_velocity_transfers == _FALSE_)) {
     psp->md_size = 0;
     if (psp->spectra_verbose > 0)
       printf("No spectra requested. Spectra module skipped.\n");
@@ -281,7 +288,7 @@ int spectra_init(
   }
   else {
     if (psp->spectra_verbose > 0)
-      printf("Computing unlensed harmonic spectra\n");
+      printf("Computing unlensed linear spectra\n");
   }
 
   /** - initialize indices and allocate some of the arrays in the
@@ -304,28 +311,164 @@ int spectra_init(
     psp->ct_size=0;
   }
 
-  /** - a pointer to the nonlinear structure is stored in the spectra
-      structure. This odd, unusual and unelegant feature has been
-      introduced in v2.8 in order to keep in use some deprecated
-      functions spectra_pk_...() that are now pointing at new
-      function nonlinear_pk_...(). In the future, if the deprecated
-      functions are removed, it will be possible to remove also this
-      pointer. */
+  /** - deal with \f$ P(k,\tau)\f$ and \f$ T_i(k,\tau)\f$ */
 
-  psp->pnl = pnl;
+  if ((ppt->has_pk_matter == _TRUE_) || (ppt->has_density_transfers == _TRUE_) || (ppt->has_velocity_transfers == _TRUE_)) {
+
+    class_call(spectra_k_and_tau(pba,ppt,pnlpt,pnl,psp),
+               psp->error_message,
+               psp->error_message);
+
+    if (ppt->has_pk_matter == _TRUE_) {
+
+      class_call(spectra_pk(pba,ppt,ppm,pnlpt,pnl,psp),
+                 psp->error_message,
+                 psp->error_message);
+
+    }
+    else {
+      psp->ln_pk=NULL;
+    }
+
+    if ((ppt->has_density_transfers == _TRUE_) || (ppt->has_velocity_transfers == _TRUE_)) {
+
+      class_call(spectra_matter_transfers(pba,ppt,psp),
+                 psp->error_message,
+                 psp->error_message);
+    }
+    else {
+      psp->matter_transfer=NULL;
+    }
+
+  }
+  else {
+    psp->ln_k_size=0;
+  }
+
+  /* if there is one isocurvature mode, compute and store in the psp
+     structure the isocurvature contribution to some bandpowers in
+     different ranges of l, and the contribution to the primordial
+     spectrum at different wavenumbers (used in the Planck
+     analysis) */
+
+  if ((ppt->has_scalars == _TRUE_) && (ppt->has_cls == _TRUE_) && (ppt->ic_size[ppt->index_md_scalars] == 2)) {
+
+    l1=2;
+    l2=20;
+
+    class_call(spectra_bandpower(psp,l1,l2,&TT_II,&TT_RI,&TT_RR),
+               psp->error_message,
+               psp->error_message);
+
+    class_test(TT_II+TT_RI+TT_RR==0.,
+               psp->error_message,
+               "should never happen");
+
+    psp->alpha_II_2_20=TT_II/(TT_II+TT_RI+TT_RR);
+    psp->alpha_RI_2_20=TT_RI/(TT_II+TT_RI+TT_RR);
+    psp->alpha_RR_2_20=TT_RR/(TT_II+TT_RI+TT_RR);
+
+    l1=21;
+    l2=200;
+
+    class_call(spectra_bandpower(psp,l1,l2,&TT_II,&TT_RI,&TT_RR),
+               psp->error_message,
+               psp->error_message);
+
+    class_test(TT_II+TT_RI+TT_RR==0.,
+               psp->error_message,
+               "should never happen");
+
+    psp->alpha_II_21_200=TT_II/(TT_II+TT_RI+TT_RR);
+    psp->alpha_RI_21_200=TT_RI/(TT_II+TT_RI+TT_RR);
+    psp->alpha_RR_21_200=TT_RR/(TT_II+TT_RI+TT_RR);
+
+    l1=201;
+    l2=2500;
+
+    class_call(spectra_bandpower(psp,l1,l2,&TT_II,&TT_RI,&TT_RR),
+               psp->error_message,
+               psp->error_message);
+
+    class_test(TT_II+TT_RI+TT_RR==0.,
+               psp->error_message,
+               "should never happen");
+
+    psp->alpha_II_201_2500=TT_II/(TT_II+TT_RI+TT_RR);
+    psp->alpha_RI_201_2500=TT_RI/(TT_II+TT_RI+TT_RR);
+    psp->alpha_RR_201_2500=TT_RR/(TT_II+TT_RI+TT_RR);
+
+    l1=2;
+    l2=2500;
+
+    class_call(spectra_bandpower(psp,l1,l2,&TT_II,&TT_RI,&TT_RR),
+               psp->error_message,
+               psp->error_message);
+
+    class_test(TT_II+TT_RI+TT_RR==0.,
+               psp->error_message,
+               "should never happen");
+
+    psp->alpha_II_2_2500=TT_II/(TT_II+TT_RI+TT_RR);
+    psp->alpha_RI_2_2500=TT_RI/(TT_II+TT_RI+TT_RR);
+    psp->alpha_RR_2_2500=TT_RR/(TT_II+TT_RI+TT_RR);
+
+    if (ppt->has_cdi==_TRUE_) {
+
+      psp->alpha_kp=ppm->f_cdi*ppm->f_cdi
+        /(1.+ppm->f_cdi*ppm->f_cdi);
+
+      psp->alpha_k1=ppm->f_cdi*ppm->f_cdi*exp((ppm->n_cdi-ppm->n_s)*log(0.002/ppm->k_pivot))
+        /(1.+ppm->f_cdi*ppm->f_cdi*exp((ppm->n_cdi-ppm->n_s)*log(0.002/ppm->k_pivot)));
+
+      psp->alpha_k2=ppm->f_cdi*ppm->f_cdi*exp((ppm->n_cdi-ppm->n_s)*log(0.1/ppm->k_pivot))
+        /(1.+ppm->f_cdi*ppm->f_cdi*exp((ppm->n_cdi-ppm->n_s)*log(0.1/ppm->k_pivot)));
+    }
+
+    if (ppt->has_nid==_TRUE_) {
+
+      psp->alpha_kp=ppm->f_nid*ppm->f_nid
+        /(1.+ppm->f_nid*ppm->f_nid);
+
+      psp->alpha_k1=ppm->f_nid*ppm->f_nid*exp((ppm->n_nid-ppm->n_s)*log(0.002/ppm->k_pivot))
+        /(1.+ppm->f_nid*ppm->f_nid*exp((ppm->n_nid-ppm->n_s)*log(0.002/ppm->k_pivot)));
+
+      psp->alpha_k2=ppm->f_nid*ppm->f_nid*exp((ppm->n_nid-ppm->n_s)*log(0.1/ppm->k_pivot))
+        /(1.+ppm->f_nid*ppm->f_nid*exp((ppm->n_nid-ppm->n_s)*log(0.1/ppm->k_pivot)));
+    }
+
+    if (ppt->has_niv==_TRUE_) {
+
+      psp->alpha_kp=ppm->f_niv*ppm->f_niv
+        /(1.+ppm->f_niv*ppm->f_niv);
+
+      psp->alpha_k1=ppm->f_niv*ppm->f_niv*exp((ppm->n_niv-ppm->n_s)*log(0.002/ppm->k_pivot))
+        /(1.+ppm->f_niv*ppm->f_niv*exp((ppm->n_niv-ppm->n_s)*log(0.002/ppm->k_pivot)));
+
+      psp->alpha_k2=ppm->f_niv*ppm->f_niv*exp((ppm->n_niv-ppm->n_s)*log(0.1/ppm->k_pivot))
+        /(1.+ppm->f_niv*ppm->f_niv*exp((ppm->n_niv-ppm->n_s)*log(0.1/ppm->k_pivot)));
+    }
+  }
+
+/*
+double k_input=1;
+double z_input=0.6035861;
+double * output;
+double * output_Id2d2;
+double * output_Id2;
+double * output_IG2;
+double * output_Id2G2;
+double * output_IG2G2;
+double * output_IFG2;
+double * output_CTR;
+double * output_Tree;
+
+class_call(spectra_pk_nl_at_k_and_z_req(ppr,pba,ppm,psp,pnl,pnlpt,k_input,z_input,output,output_Id2d2,output_Id2,output_IG2,output_Id2G2,output_IG2G2,output_IFG2,output_CTR,output_Tree),
+                 psp->error_message,
+                 psp->error_message); */
 
   return _SUCCESS_;
 }
-
-/**
- * This routine frees all the memory space allocated by spectra_init().
- *
- * To be called at the end of each run, only when no further calls to
- * spectra_cls_at_l(), spectra_pk_at_z(), spectra_pk_at_k_and_z() are needed.
- *
- * @param psp Input: pointer to spectra structure (which fields must be freed)
- * @return the error status
- */
 
 int spectra_free(
                  struct spectra * psp
@@ -334,6 +477,7 @@ int spectra_free(
   int index_md;
 
   if (psp->md_size > 0) {
+
     if (psp->ct_size > 0) {
 
       for (index_md = 0; index_md < psp->md_size; index_md++) {
@@ -349,18 +493,169 @@ int spectra_free(
       free(psp->ddcl);
     }
 
-    for (index_md=0; index_md < psp->md_size; index_md++)
-      free(psp->is_non_zero[index_md]);
+    if (psp->ln_k_size > 0) {
 
-    free(psp->is_non_zero);
-    free(psp->ic_size);
-    free(psp->ic_ic_size);
+      free(psp->ln_tau);
+      free(psp->ln_k);
 
+      if (psp->ln_pk != NULL) {
+
+        free(psp->ln_pk);
+
+        if (psp->ln_tau_size > 1) {
+          free(psp->ddln_pk);
+        }
+
+        free(psp->ln_pk_l);
+
+        if (psp->ln_tau_size > 1) {
+          free(psp->ddln_pk_l);
+        }
+
+        if (psp->ln_pk_nl != NULL) {
+
+          free(psp->ln_tau_nl);
+          free(psp->ln_pk_nl);
+          free(psp->ln_pk_nl_Id2d2);
+            free(psp->ln_pk_nl_Id2);
+            free(psp->ln_pk_nl_IG2);
+            free(psp->ln_pk_nl_Id2G2);
+            free(psp->ln_pk_nl_IG2G2);
+            free(psp->ln_pk_nl_IFG2);
+            free(psp->ln_pk_nl_IFG2_0b1);
+            free(psp->ln_pk_nl_IFG2_0);
+            free(psp->ln_pk_nl_IFG2_2);
+            free(psp->ln_pk_nl_CTR);
+            free(psp->ln_pk_nl_CTR_0);
+            free(psp->ln_pk_nl_CTR_2);
+            free(psp->ln_pk_nl_CTR_4);
+          free(psp->ln_pk_nl_Tree);
+            free(psp->ln_pk_nl_Tree_0_vv);
+            free(psp->ln_pk_nl_Tree_0_vd);
+            free(psp->ln_pk_nl_Tree_0_dd);
+            free(psp->ln_pk_nl_Tree_2_vv);
+            free(psp->ln_pk_nl_Tree_2_vd);
+            free(psp->ln_pk_nl_Tree_4_vv);
+            free(psp->ln_pk_0_vv);
+            free(psp->ln_pk_0_vd);
+            free(psp->ln_pk_0_dd);
+            free(psp->ln_pk_2_vv);
+            free(psp->ln_pk_2_vd);
+            free(psp->ln_pk_2_dd);
+            free(psp->ln_pk_4_vv);
+            free(psp->ln_pk_4_vd);
+            free(psp->ln_pk_4_dd);
+            free(psp->ln_pk_0_b1b2);
+            free(psp->ln_pk_0_b2);
+            free(psp->ln_pk_0_b1bG2);
+            free(psp->ln_pk_0_bG2);
+            
+            free(psp->ln_pk_2_b1b2);
+            free(psp->ln_pk_2_b2);
+            free(psp->ln_pk_2_b1bG2);
+            free(psp->ln_pk_2_bG2);
+            
+            free(psp->ln_pk_4_b2);
+            free(psp->ln_pk_4_bG2);
+            free(psp->ln_pk_4_b1b2);
+            free(psp->ln_pk_4_b1bG2);
+            
+            free(psp->ln_pk_2_b2b2);
+            free(psp->ln_pk_2_b2bG2);
+            free(psp->ln_pk_2_bG2bG2);
+            free(psp->ln_pk_4_b2b2);
+            free(psp->ln_pk_4_b2bG2);
+            free(psp->ln_pk_4_bG2bG2);
+
+          if (psp->ln_tau_nl_size > 1) {
+            free(psp->ddln_pk_nl);
+            free(psp->ddln_pk_nl_Id2d2);
+               free(psp->ddln_pk_nl_Id2);
+              free(psp->ddln_pk_nl_IG2);
+              free(psp->ddln_pk_nl_Id2G2);
+               free(psp->ddln_pk_nl_IG2G2);
+              free(psp->ddln_pk_nl_IFG2);
+              free(psp->ddln_pk_nl_IFG2_0b1);
+              free(psp->ddln_pk_nl_IFG2_0);
+              free(psp->ddln_pk_nl_IFG2_2);
+              free(psp->ddln_pk_nl_CTR);
+                            free(psp->ddln_pk_nl_CTR_0);
+                            free(psp->ddln_pk_nl_CTR_2);
+                            free(psp->ddln_pk_nl_CTR_4);
+              free(psp->ddln_pk_nl_Tree);
+              free(psp->ddln_pk_nl_Tree_0_vv);
+              free(psp->ddln_pk_nl_Tree_0_vd);
+              free(psp->ddln_pk_nl_Tree_0_dd);
+              free(psp->ddln_pk_nl_Tree_2_vv);
+              free(psp->ddln_pk_nl_Tree_2_vd);
+              free(psp->ddln_pk_nl_Tree_4_vv);
+              free(psp->ddln_pk_0_vv);
+              free(psp->ddln_pk_0_vd);
+              free(psp->ddln_pk_0_dd);
+              free(psp->ddln_pk_2_vv);
+              free(psp->ddln_pk_2_vd);
+              free(psp->ddln_pk_2_dd);
+              free(psp->ddln_pk_4_vv);
+              free(psp->ddln_pk_4_vd);
+              free(psp->ddln_pk_4_dd);
+              free(psp->ddln_pk_0_b1b2);
+              free(psp->ddln_pk_0_b2);
+              free(psp->ddln_pk_0_b1bG2);
+              free(psp->ddln_pk_0_bG2);
+              
+              free(psp->ddln_pk_2_b1b2);
+              free(psp->ddln_pk_2_b2);
+              free(psp->ddln_pk_2_b1bG2);
+              free(psp->ddln_pk_2_bG2);
+              
+              free(psp->ddln_pk_4_b2);
+              free(psp->ddln_pk_4_bG2);
+              free(psp->ddln_pk_4_b1b2);
+              free(psp->ddln_pk_4_b1bG2);
+              
+              free(psp->ddln_pk_2_b2b2);
+              free(psp->ddln_pk_2_b2bG2);
+              free(psp->ddln_pk_2_bG2bG2);
+              free(psp->ddln_pk_4_b2b2);
+              free(psp->ddln_pk_4_b2bG2);
+              free(psp->ddln_pk_4_bG2bG2);
+          }
+        }
+
+      }
+
+      if (psp->matter_transfer != NULL) {
+
+        free(psp->matter_transfer);
+        if (psp->ln_tau_size > 1) {
+          free(psp->ddmatter_transfer);
+        }
+      }
+    }
   }
+
+    
+  for (index_md=0; index_md < psp->md_size; index_md++)
+  free(psp->is_non_zero[index_md]);
+  free(psp->is_non_zero);
+  free(psp->ic_size);
+  free(psp->ic_ic_size);
+    
 
   return _SUCCESS_;
 
 }
+
+/**
+ * This routine defines indices and allocates tables in the spectra structure
+ *
+ * @param pba  Input: pointer to background structure
+ * @param ppt  Input: pointer to perturbation structure
+ * @param ptr  Input: pointer to transfers structure
+ * @param ppm  Input: pointer to primordial structure
+ * @param psp  Input/output: pointer to spectra structure
+ * @return the error status
+ */
 
 /**
  * This routine defines indices and allocates tables in the spectra structure
@@ -384,6 +679,7 @@ int spectra_indices(
   int index_ct;
   int index_md;
   int index_ic1_ic2;
+  int index_tr;
 
   psp->md_size = ppt->md_size;
   if (ppt->has_scalars == _TRUE_)
@@ -644,6 +940,42 @@ int spectra_indices(
       psp->l_max_tot = MAX(psp->l_max_tot,psp->l_max[index_md]);
     }
   }
+
+  /* indices for species associated with a matter transfer function in Fourier space */
+
+  index_tr=0;
+  class_define_index(psp->index_tr_delta_g,ppt->has_source_delta_g,index_tr,1);
+  class_define_index(psp->index_tr_delta_b,ppt->has_source_delta_b,index_tr,1);
+  class_define_index(psp->index_tr_delta_cdm,ppt->has_source_delta_cdm,index_tr,1);
+  class_define_index(psp->index_tr_delta_dcdm,ppt->has_source_delta_dcdm,index_tr,1);
+  class_define_index(psp->index_tr_delta_scf,ppt->has_source_delta_scf,index_tr,1);
+  class_define_index(psp->index_tr_delta_fld,ppt->has_source_delta_fld,index_tr,1);
+  class_define_index(psp->index_tr_delta_ur,ppt->has_source_delta_ur,index_tr,1);
+  class_define_index(psp->index_tr_delta_dr,ppt->has_source_delta_dr,index_tr,1);
+  class_define_index(psp->index_tr_delta_ncdm1,ppt->has_source_delta_ncdm,index_tr,pba->N_ncdm);
+  class_define_index(psp->index_tr_delta_tot,ppt->has_density_transfers,index_tr,1);
+  class_define_index(psp->index_tr_phi,ppt->has_source_phi,index_tr,1);
+  class_define_index(psp->index_tr_psi,ppt->has_source_psi,index_tr,1);
+  class_define_index(psp->index_tr_phi,ppt->has_source_phi_prime,index_tr,1);
+  class_define_index(psp->index_tr_h,ppt->has_source_h,index_tr,1);
+  class_define_index(psp->index_tr_h_prime,ppt->has_source_h_prime,index_tr,1);
+  class_define_index(psp->index_tr_eta,ppt->has_source_eta,index_tr,1);
+  class_define_index(psp->index_tr_eta_prime,ppt->has_source_eta_prime,index_tr,1);
+
+  /* indices for species associated with a velocity transfer function in Fourier space */
+
+  class_define_index(psp->index_tr_theta_g,ppt->has_source_theta_g,index_tr,1);
+  class_define_index(psp->index_tr_theta_b,ppt->has_source_theta_b,index_tr,1);
+  class_define_index(psp->index_tr_theta_cdm,ppt->has_source_theta_cdm,index_tr,1);
+  class_define_index(psp->index_tr_theta_dcdm,ppt->has_source_theta_dcdm,index_tr,1);
+  class_define_index(psp->index_tr_theta_scf,ppt->has_source_theta_scf,index_tr,1);
+  class_define_index(psp->index_tr_theta_fld,ppt->has_source_theta_fld,index_tr,1);
+  class_define_index(psp->index_tr_theta_ur,ppt->has_source_theta_ur,index_tr,1);
+  class_define_index(psp->index_tr_theta_dr,ppt->has_source_theta_dr,index_tr,1);
+  class_define_index(psp->index_tr_theta_ncdm1,ppt->has_source_theta_ncdm,index_tr,pba->N_ncdm);
+  class_define_index(psp->index_tr_theta_tot,ppt->has_velocity_transfers,index_tr,1);
+
+  psp->tr_size = index_tr;
 
   return _SUCCESS_;
 
@@ -1091,7 +1423,7 @@ int spectra_compute_cl(
         primordial_pk[index_ic1_ic2]
         * transfer_ic1[ptr->index_tt_lcmb]
         * transfer_ic2[ptr->index_tt_lcmb]
-        * factor;
+        * factor * psp->A_lens;;
 
     if (_scalars_ && (psp->has_tp == _TRUE_))
       cl_integrand[index_q*cl_integrand_num_columns+1+psp->index_ct_tp]=
@@ -1350,30 +1682,53 @@ int spectra_pk_at_k_and_z(
                           struct spectra * psp,
                           double k,
                           double z,
-                          double * pk_tot,    /* pointer to a single number (must be already allocated) */
-                          double * pk_ic,     /* array of argument pk_ic[index_ic1_ic2]
-                                                 (must be already allocated only if several initial conditions) */
-                          double * pk_cb_tot, /* same as pk_tot for baryon+CDM part only */
-                          double * pk_cb_ic   /* same as pk_ic  for baryon+CDM part only */
+                          double * pk,
+                          double * pk_tot, /* pointer to a single number (must be already allocated) */
+                          double * pk_ic,   /* array of argument pk_ic[index_ic1_ic2] (must be already allocated only if several initial conditions) */
+                          double * pk_cb,
+                          double * pk_cb_ic
                           ) {
 
-  fprintf(stderr," -> [WARNING:] You are calling the function spectra_pk_at_k_and_z() which is deprecated since v2.8. Try using nonlinear_pk_linear_at_k_and_z() instead.\n");
+  /** Summary: */
 
-  class_call(nonlinear_pks_at_k_and_z(pba,
-                                      ppm,
-                                      psp->pnl,
-                                      pk_linear,
-                                      k,
-                                      z,
-                                      pk_tot,
-                                      pk_ic,
-                                      pk_cb_tot,
-                                      pk_cb_ic),
-             psp->pnl->error_message,
-             psp->error_message);
+  /** - define local variables */
 
-  return _SUCCESS_;
-}
+  int index_md;
+  int index_k;
+  int last_index;
+  int index_ic1,index_ic2,index_ic1_ic2;
+
+  double * spectrum_at_z = NULL;
+  double * spectrum_at_z_ic = NULL;
+  double * spline;
+  double * pk_primordial_k = NULL;
+  double kmin;
+  double * pk_primordial_kmin = NULL;
+
+  index_md = psp->index_md_scalars;
+
+  /** - first step: check that k is in valid range [0:kmax] (the test for z will be done when calling spectra_pk_at_z()) */
+
+  class_test((k < 0.) || (k > exp(psp->ln_k[psp->ln_k_size-1])),
+             psp->error_message,
+             "k=%e out of bounds [%e:%e]",k,0.,exp(psp->ln_k[psp->ln_k_size-1]));
+
+  /** - deal with case 0 <= k < kmin */
+
+  if (k < exp(psp->ln_k[0])) {
+
+    /** - --> (a) subcase k=0: then P(k)=0 */
+
+    if (k == 0.) {
+      if (psp->ic_size[index_md] == 1) {
+        *pk_tot=0.;
+      }
+      else {
+        for (index_ic1_ic2 = 0; index_ic1_ic2 < psp->ic_ic_size[index_md]; index_ic1_ic2++) {
+          pk_ic[index_ic1_ic2] = 0.;
+        }
+      }
+    }
 
 /**
  * Non-linear total matter power spectrum for arbitrary redshift.
@@ -1417,6 +1772,207 @@ int spectra_pk_nl_at_z(
 
 }
 
+int spectra_pk_nl_bias_at_z_i(
+                              struct background * pba,
+                              struct nonlinear_pt *pnlpt,
+                              struct spectra * psp,
+                              enum linear_or_logarithmic mode,
+                              int i_z, /* number(s) of redshift at which P(k,z) and T_i(k,z) should be written*/
+                              double * output_tot, /* array with argument output_tot[index_k] (must be already allocated) */
+                              double * output_tot_Id2d2,
+                              double * output_tot_Id2,
+                              double * output_tot_IG2,
+                              double * output_tot_Id2G2,
+                              double * output_tot_IG2G2,
+                              double * output_tot_IFG2,
+                              double * output_tot_IFG2_0b1,
+                              double * output_tot_IFG2_0,
+                              double * output_tot_IFG2_2,
+                              double * output_tot_CTR,
+                              double * output_tot_CTR_0,
+                              double * output_tot_CTR_2,
+                              double * output_tot_CTR_4,
+                              double * output_tot_Tree,
+                              double * output_tot_Tree_0_vv,
+                              double * output_tot_Tree_0_vd,
+                              double * output_tot_Tree_0_dd,
+                              double * output_tot_Tree_2_vv,
+                              double * output_tot_Tree_2_vd,
+                              double * output_tot_Tree_4_vv,
+                              double * output_tot_0_vv,
+                              double * output_tot_0_vd,
+                              double * output_tot_0_dd,
+                              double * output_tot_2_vv,
+                              double * output_tot_2_vd,
+                              double * output_tot_2_dd,
+                              double * output_tot_4_vv,
+                              double * output_tot_4_vd,
+                              double * output_tot_4_dd,
+                              double * output_tot_0_b1b2,
+                              double * output_tot_0_b2,
+                              double * output_tot_0_b1bG2,
+                              double * output_tot_0_bG2,
+                              double * output_tot_2_b1b2,
+                              double * output_tot_2_b2,
+                              double * output_tot_2_b1bG2,
+                              double * output_tot_2_bG2,
+                              double * output_tot_4_b2,
+                              double * output_tot_4_bG2,
+                              double * output_tot_4_b1b2,
+                              double * output_tot_4_b1bG2,
+                              double * output_tot_2_b2b2,
+                              double * output_tot_2_b2bG2,
+                              double * output_tot_2_bG2bG2,
+                              double * output_tot_4_b2b2,
+                              double * output_tot_4_b2bG2,
+                              double * output_tot_4_bG2bG2
+                       ) {
+    
+    /** Summary: */
+    
+    /** - define local variables */
+    
+    int last_index;
+    int last_index2;
+    int last_index3;
+    int last_index4;
+    int last_index5;
+    int last_index6;
+    int last_index7;
+    int last_index8;
+    int last_index9;
+    int index_k;
+    double tau,ln_tau;
+    
+    /** - second step: for both modes (linear or logarithmic), store the spectrum in logarithmic format in the output array(s) */
+    
+    /** - --> (a) if only values at tau=tau_today are stored and we want P(k,z=0), no need to interpolate */
+      
+        for (index_k=0; index_k<pnlpt->ln_k_size; index_k++) {
+            output_tot[index_k] = pnlpt->ln_pk_nl[i_z*pnlpt->k_size+index_k];
+            output_tot_Id2d2[index_k] = pnlpt->ln_pk_Id2d2[i_z*pnlpt->k_size+index_k];
+            output_tot_Id2[index_k] = pnlpt->ln_pk_Id2[i_z*pnlpt->k_size+index_k];
+            output_tot_IG2[index_k] = pnlpt->ln_pk_IG2[i_z*pnlpt->k_size+index_k];
+            output_tot_Id2G2[index_k] = pnlpt->ln_pk_Id2G2[i_z*pnlpt->k_size+index_k];
+            output_tot_IG2G2[index_k] = pnlpt->ln_pk_IG2G2[i_z*pnlpt->k_size+index_k];
+            output_tot_IFG2[index_k] = pnlpt->ln_pk_IFG2[i_z*pnlpt->k_size+index_k];
+            output_tot_IFG2_0b1[index_k] = pnlpt->ln_pk_IFG2_0b1[i_z*pnlpt->k_size+index_k];
+            output_tot_IFG2_0[index_k] = pnlpt->ln_pk_IFG2_0[i_z*pnlpt->k_size+index_k];
+            output_tot_IFG2_2[index_k] = pnlpt->ln_pk_IFG2_2[i_z*pnlpt->k_size+index_k];
+            output_tot_CTR[index_k] = pnlpt->ln_pk_CTR[i_z*pnlpt->k_size+index_k];
+            output_tot_CTR_0[index_k] = pnlpt->ln_pk_CTR_0[i_z*pnlpt->k_size+index_k];
+            output_tot_CTR_2[index_k] = pnlpt->ln_pk_CTR_2[i_z*pnlpt->k_size+index_k];
+            output_tot_CTR_4[index_k] = pnlpt->ln_pk_CTR_4[i_z*pnlpt->k_size+index_k];
+            output_tot_Tree[index_k] = pnlpt->ln_pk_Tree[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_Tree_0_vv[index_k] = pnlpt->ln_pk_Tree_0_vv[i_z*pnlpt->k_size+index_k];
+            output_tot_Tree_0_vd[index_k] = pnlpt->ln_pk_Tree_0_vd[i_z*pnlpt->k_size+index_k];
+            output_tot_Tree_0_dd[index_k] = pnlpt->ln_pk_Tree_0_dd[i_z*pnlpt->k_size+index_k];
+            output_tot_Tree_2_vv[index_k] = pnlpt->ln_pk_Tree_2_vv[i_z*pnlpt->k_size+index_k];
+            output_tot_Tree_2_vd[index_k] = pnlpt->ln_pk_Tree_2_vd[i_z*pnlpt->k_size+index_k];
+            output_tot_Tree_4_vv[index_k] = pnlpt->ln_pk_Tree_4_vv[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_0_vv[index_k] = pnlpt->ln_pk_0_vv[i_z*pnlpt->k_size+index_k];
+            output_tot_0_vd[index_k] = pnlpt->ln_pk_0_vd[i_z*pnlpt->k_size+index_k];
+            output_tot_0_dd[index_k] = pnlpt->ln_pk_0_dd[i_z*pnlpt->k_size+index_k];
+            output_tot_2_vv[index_k] = pnlpt->ln_pk_2_vv[i_z*pnlpt->k_size+index_k];
+            output_tot_2_vd[index_k] = pnlpt->ln_pk_2_vd[i_z*pnlpt->k_size+index_k];
+            output_tot_2_dd[index_k] = pnlpt->ln_pk_2_dd[i_z*pnlpt->k_size+index_k];
+            output_tot_4_vv[index_k] = pnlpt->ln_pk_4_vv[i_z*pnlpt->k_size+index_k];
+            output_tot_4_vd[index_k] = pnlpt->ln_pk_4_vd[i_z*pnlpt->k_size+index_k];
+            output_tot_4_dd[index_k] = pnlpt->ln_pk_4_dd[i_z*pnlpt->k_size+index_k];
+            output_tot_0_b1b2[index_k] = pnlpt->ln_pk_0_b1b2[i_z*pnlpt->k_size+index_k];
+            output_tot_0_b1bG2[index_k] = pnlpt->ln_pk_0_b1bG2[i_z*pnlpt->k_size+index_k];
+            output_tot_0_b2[index_k] = pnlpt->ln_pk_0_b2[i_z*pnlpt->k_size+index_k];
+            output_tot_0_bG2[index_k] = pnlpt->ln_pk_0_bG2[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_2_b1b2[index_k] = pnlpt->ln_pk_2_b1b2[i_z*pnlpt->k_size+index_k];
+            output_tot_2_b1bG2[index_k] = pnlpt->ln_pk_2_b1bG2[i_z*pnlpt->k_size+index_k];
+            output_tot_2_b2[index_k] = pnlpt->ln_pk_2_b2[i_z*pnlpt->k_size+index_k];
+            output_tot_2_bG2[index_k] = pnlpt->ln_pk_2_bG2[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_4_b2[index_k] = pnlpt->ln_pk_4_b2[i_z*pnlpt->k_size+index_k];
+            output_tot_4_bG2[index_k] = pnlpt->ln_pk_4_bG2[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_4_b1b2[index_k] = pnlpt->ln_pk_4_b1b2[i_z*pnlpt->k_size+index_k];
+            output_tot_4_b1bG2[index_k] = pnlpt->ln_pk_4_b1bG2[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_2_b2b2[index_k] = pnlpt->ln_pk_Id2d2_2[i_z*pnlpt->k_size+index_k];
+            output_tot_2_b2bG2[index_k] = pnlpt->ln_pk_Id2G2_2[i_z*pnlpt->k_size+index_k];
+            output_tot_2_bG2bG2[index_k] = pnlpt->ln_pk_IG2G2_2[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_4_b2b2[index_k] = pnlpt->ln_pk_Id2d2_4[i_z*pnlpt->k_size+index_k];
+            output_tot_4_b2bG2[index_k] = pnlpt->ln_pk_Id2G2_4[i_z*pnlpt->k_size+index_k];
+            output_tot_4_bG2bG2[index_k] = pnlpt->ln_pk_IG2G2_4[i_z*pnlpt->k_size+index_k];
+
+            
+        }
+
+    /** - fourth step: eventually convert to linear format */
+    
+    if (mode == linear) {
+        for (index_k=0; index_k<pnlpt->ln_k_size; index_k++) {
+            output_tot[index_k] = exp(output_tot[index_k]);
+            output_tot_Id2d2[index_k] = exp(output_tot_Id2d2[index_k]);
+            output_tot_Id2[index_k] = exp(output_tot_Id2[index_k]);
+            output_tot_IG2[index_k] = exp(output_tot_IG2[index_k]);
+            output_tot_Id2G2[index_k] = exp(output_tot_Id2G2[index_k]);
+            output_tot_IG2G2[index_k] = exp(output_tot_IG2G2[index_k]);
+            output_tot_IFG2[index_k] = exp(output_tot_IFG2[index_k]);
+            output_tot_IFG2_0b1[index_k] = exp(output_tot_IFG2_0b1[index_k]);
+            output_tot_IFG2_0[index_k] = exp(output_tot_IFG2_0[index_k]);
+            output_tot_IFG2_2[index_k] = exp(output_tot_IFG2_2[index_k]);
+            output_tot_CTR[index_k] = exp(output_tot_CTR[index_k]);
+            output_tot_CTR_0[index_k] = exp(output_tot_CTR_0[index_k]);
+            output_tot_CTR_2[index_k] = exp(output_tot_CTR_2[index_k]);
+            output_tot_CTR_4[index_k] = exp(output_tot_CTR_4[index_k]);
+            output_tot_Tree[index_k] = exp(output_tot_Tree[index_k]);
+            output_tot_Tree_0_vv[index_k] = exp(output_tot_Tree_0_vv[index_k]);
+            output_tot_Tree_0_vd[index_k] = exp(output_tot_Tree_0_vd[index_k]);
+            output_tot_Tree_0_dd[index_k] = exp(output_tot_Tree_0_dd[index_k]);
+            output_tot_Tree_2_vv[index_k] = exp(output_tot_Tree_2_vv[index_k]);
+            output_tot_Tree_2_vd[index_k] = exp(output_tot_Tree_2_vd[index_k]);
+            output_tot_Tree_4_vv[index_k] = exp(output_tot_Tree_4_vv[index_k]);
+            output_tot_0_vv[index_k] = exp(output_tot_0_vv[index_k]);
+            output_tot_0_vd[index_k] = exp(output_tot_0_vd[index_k]);
+            output_tot_0_dd[index_k] = exp(output_tot_0_dd[index_k]);
+            output_tot_2_vv[index_k] = exp(output_tot_2_vv[index_k]);
+            output_tot_2_vd[index_k] = exp(output_tot_2_vd[index_k]);
+            output_tot_2_dd[index_k] = exp(output_tot_2_dd[index_k]);
+            output_tot_4_vv[index_k] = exp(output_tot_4_vv[index_k]);
+            output_tot_4_vd[index_k] = exp(output_tot_4_vd[index_k]);
+            output_tot_4_dd[index_k] = exp(output_tot_4_dd[index_k]);
+            output_tot_0_b1b2[index_k] = exp(output_tot_0_b1b2[index_k]);
+            output_tot_0_b1bG2[index_k] = exp(output_tot_0_b1bG2[index_k]);
+            output_tot_0_b2[index_k] = exp(output_tot_0_b2[index_k]);
+            output_tot_0_bG2[index_k] = exp(output_tot_0_bG2[index_k]);
+            
+            output_tot_2_b1b2[index_k] = exp(output_tot_2_b1b2[index_k]);
+            output_tot_2_b1bG2[index_k] = exp(output_tot_2_b1bG2[index_k]);
+            output_tot_2_b2[index_k] = exp(output_tot_2_b2[index_k]);
+            output_tot_2_bG2[index_k] = exp(output_tot_2_bG2[index_k]);
+            
+            output_tot_4_b2[index_k] = exp(output_tot_4_b2[index_k]);
+            output_tot_4_bG2[index_k] = exp(output_tot_4_bG2[index_k]);
+            output_tot_4_b1b2[index_k] = exp(output_tot_4_b1b2[index_k]);
+            output_tot_4_b1bG2[index_k] = exp(output_tot_4_b1bG2[index_k]);
+            
+            output_tot_2_b2b2[index_k] = exp(output_tot_2_b2b2[index_k]);
+            output_tot_2_b2bG2[index_k] = exp(output_tot_2_b2bG2[index_k]);
+            output_tot_2_bG2bG2[index_k] = exp(output_tot_2_bG2bG2[index_k]);
+            
+            output_tot_4_b2b2[index_k] = exp(output_tot_4_b2b2[index_k]);
+            output_tot_4_b2bG2[index_k] = exp(output_tot_4_b2bG2[index_k]);
+            output_tot_4_bG2bG2[index_k] = exp(output_tot_4_bG2bG2[index_k]);
+
+        }
+    }
+    
+    return _SUCCESS_;
+    
+}
+
+
 /**
  * Non-linear total matter power spectrum for arbitrary wavenumber and redshift.
  *
@@ -1436,27 +1992,1827 @@ int spectra_pk_nl_at_k_and_z(
                              struct background * pba,
                              struct primordial * ppm,
                              struct spectra * psp,
+                             struct nonlinear * pnl,
+                             struct nonlinear_pt * pnlpt,
                              double k,
                              double z,
                              double * pk_tot,   /* pointer to a single number (must be already allocated) */
-                             double * pk_cb_tot /* same as pk_tot for baryon+CDM only */
+                             double * pk_cb_tot, /* same as pk_tot for baryon+CDM only */
+                             double * pk_tot_Id2d2,
+                             double * pk_tot_Id2,
+                             double * pk_tot_IG2,
+                             double * pk_tot_Id2G2,
+                             double * pk_tot_IG2G2,
+                             double * pk_tot_IFG2,
+                             double * pk_tot_IFG2_0b1,
+                             double * pk_tot_IFG2_0,
+                             double * pk_tot_IFG2_2,
+                             double * pk_tot_CTR,
+                             double * pk_tot_CTR_0,
+                             double * pk_tot_CTR_2,
+                             double * pk_tot_CTR_4,
+                             double * pk_tot_Tree,
+                             double * pk_tot_Tree_0_vv,
+                             double * pk_tot_Tree_0_vd,
+                             double * pk_tot_Tree_0_dd,
+                             double * pk_tot_Tree_2_vv,
+                             double * pk_tot_Tree_2_vd,
+                             double * pk_tot_Tree_4_vv,
+                             double * pk_tot_0_vv,
+                             double * pk_tot_0_vd,
+                             double * pk_tot_0_dd,
+                             double * pk_tot_2_vv,
+                             double * pk_tot_2_vd,
+                             double * pk_tot_2_dd,
+                             double * pk_tot_4_vv,
+                             double * pk_tot_4_vd,
+                             double * pk_tot_4_dd,
+                             double * pk_tot_0_b1b2,
+                             double * pk_tot_0_b2,
+                             double * pk_tot_0_b1bG2,
+                             double * pk_tot_0_bG2,
+                             double * pk_tot_2_b1b2,
+                             double * pk_tot_2_b2,
+                             double * pk_tot_2_b1bG2,
+                             double * pk_tot_2_bG2,
+                             double * pk_tot_4_b2,
+                             double * pk_tot_4_bG2,
+                             double * pk_tot_4_b1b2,
+                             double * pk_tot_4_b1bG2,
+                             double * pk_tot_2_b2b2,
+                             double * pk_tot_2_b2bG2,
+                             double * pk_tot_2_bG2bG2,
+                             double * pk_tot_4_b2b2,
+                             double * pk_tot_4_b2bG2,
+                             double * pk_tot_4_bG2bG2
                              ) {
 
-  fprintf(stderr," -> [WARNING:] You are calling the function spectra_pk_nl_at_k_and_z() which is deprecated since v2.8. Try using nonlinear_pk_at_k_and_z() instead.\n");
+  /** Summary: */
 
-  class_call(nonlinear_pks_at_k_and_z(pba,
-                                      ppm,
-                                      psp->pnl,
-                                      pk_nonlinear,
-                                      k,
-                                      z,
-                                      pk_tot,
-                                      NULL,
-                                      pk_cb_tot,
-                                      NULL
-                                      ),
-             psp->pnl->error_message,
+  /** - define local variables */
+    
+
+  int index_md;
+  int last_index;
+    int last_index2;
+    int last_index3;
+    int last_index4;
+    int last_index5;
+    int last_index6;
+    int last_index7;
+    int last_index8;
+    int last_index9;
+    
+    int last_index10;
+    int last_index11;
+    int last_index12;
+    
+
+  double * spectrum_at_z = NULL;
+  double * spectrum_Id2d2_at_z = NULL;
+    double * spectrum_Id2_at_z = NULL;
+    double * spectrum_IG2_at_z = NULL;
+      double * spectrum_Id2G2_at_z = NULL;
+    double * spectrum_IG2G2_at_z = NULL;
+    double * spectrum_IFG2_at_z = NULL;
+    double * spectrum_IFG2_0b1_at_z = NULL;
+    double * spectrum_IFG2_0_at_z = NULL;
+    double * spectrum_IFG2_2_at_z = NULL;
+     double * spectrum_CTR_at_z = NULL;
+    double * spectrum_CTR_0_at_z = NULL;
+    double * spectrum_CTR_2_at_z = NULL;
+    double * spectrum_CTR_4_at_z = NULL;
+     double * spectrum_Tree_at_z = NULL;
+    double * spectrum_Tree_0_vv_at_z = NULL;
+    double * spectrum_Tree_0_vd_at_z = NULL;
+    double * spectrum_Tree_0_dd_at_z = NULL;
+    double * spectrum_Tree_2_vv_at_z = NULL;
+    double * spectrum_Tree_2_vd_at_z = NULL;
+    double * spectrum_Tree_4_vv_at_z = NULL;
+  double * spline;
+  double * spline_Id2d2;
+    double * spline_Id2;
+    double * spline_IG2;
+      double * spline_Id2G2;
+     double * spline_IG2G2;
+    double * spline_IFG2;
+    double * spline_IFG2_0b1;
+    double * spline_IFG2_0;
+    double * spline_IFG2_2;
+    double * spline_CTR;
+    double * spline_CTR_2;
+    double * spline_CTR_4;
+    double * spline_CTR_0;
+    double * spline_Tree;
+    
+    double * spline_Tree_0_vv;
+    double * spline_Tree_0_vd;
+    double * spline_Tree_0_dd;
+    double * spline_Tree_2_vv;
+    double * spline_Tree_2_vd;
+    double * spline_Tree_4_vv;
+    
+    double * spectrum_0_vv_at_z = NULL;
+    double * spline_0_vv;
+    double * spectrum_0_vd_at_z = NULL;
+    double * spline_0_vd;
+    double * spectrum_0_dd_at_z = NULL;
+    double * spline_0_dd;
+    
+    double * spectrum_2_vv_at_z = NULL;
+    double * spline_2_vv;
+    double * spectrum_2_vd_at_z = NULL;
+    double * spline_2_vd;
+    double * spectrum_2_dd_at_z = NULL;
+    double * spline_2_dd;
+    
+    double * spectrum_4_vv_at_z = NULL;
+    double * spline_4_vv;
+    double * spectrum_4_vd_at_z = NULL;
+    double * spline_4_vd;
+    double * spectrum_4_dd_at_z = NULL;
+    double * spline_4_dd;
+    
+    double * spectrum_0_b1b2_at_z = NULL;
+    double * spline_0_b1b2;
+    double * spectrum_0_b2_at_z = NULL;
+    double * spline_0_b2;
+    double * spectrum_0_b1bG2_at_z = NULL;
+    double * spline_0_b1bG2;
+    double * spectrum_0_bG2_at_z = NULL;
+    double * spline_0_bG2;
+    
+    double * spectrum_2_b1b2_at_z = NULL;
+    double * spline_2_b1b2;
+    double * spectrum_2_b2_at_z = NULL;
+    double * spline_2_b2;
+    double * spectrum_2_b1bG2_at_z = NULL;
+    double * spline_2_b1bG2;
+    double * spectrum_2_bG2_at_z = NULL;
+    double * spline_2_bG2;
+    
+    double * spectrum_4_b2_at_z = NULL;
+    double * spline_4_b2;
+    double * spectrum_4_bG2_at_z = NULL;
+    double * spline_4_bG2;
+    double * spectrum_4_b1b2_at_z = NULL;
+    double * spline_4_b1b2;
+    double * spectrum_4_b1bG2_at_z = NULL;
+    double * spline_4_b1bG2;
+    
+    double * spectrum_2_b2b2_at_z = NULL;
+    double * spline_2_b2b2;
+    double * spectrum_2_b2bG2_at_z = NULL;
+    double * spline_2_b2bG2;
+    double * spectrum_2_bG2bG2_at_z = NULL;
+    double * spline_2_bG2bG2;
+    
+    double * spectrum_4_b2b2_at_z = NULL;
+    double * spline_4_b2b2;
+    double * spectrum_4_b2bG2_at_z = NULL;
+    double * spline_4_b2bG2;
+    double * spectrum_4_bG2bG2_at_z = NULL;
+    double * spline_4_bG2bG2;
+
+  index_md = psp->index_md_scalars;
+
+  /** - check that k is in valid range [0:kmax] (the test for z will be done when calling spectra_pk_at_z()) */
+
+  //printf("k=%e\n",k);
+  class_test((k < exp(pnlpt->ln_k[0])) || (k > exp(pnlpt->ln_k[pnlpt->ln_k_size-1])),
+             psp->error_message,
+             "k=%e out of bounds [%e:%e]",k,0.,exp(pnlpt->ln_k[pnlpt->ln_k_size-1]));
+
+  /** - compute P(k,z) (in logarithmic format for more accurate interpolation) */
+  class_alloc(spectrum_at_z,
+              pnlpt->ln_k_size*sizeof(double),
+              psp->error_message);
+    
+    class_alloc(spectrum_Id2d2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_Id2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_IG2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_Id2G2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_IG2G2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_IFG2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_IFG2_0b1_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_IFG2_0_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_IFG2_2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_CTR_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_CTR_0_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_CTR_2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_CTR_4_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_Tree_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_Tree_0_vv_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_Tree_0_vd_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_Tree_0_dd_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_Tree_2_vv_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_Tree_2_vd_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_Tree_4_vv_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_0_vv_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_0_vd_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_0_dd_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_2_vv_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_2_vd_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_2_dd_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_4_vv_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_4_vd_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_4_dd_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_0_b1b2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_0_b2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_0_b1bG2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_0_bG2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_2_b1b2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_2_b2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_2_b1bG2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_2_bG2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_4_b2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_4_bG2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_4_b1b2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_4_b1bG2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+
+    class_alloc(spectrum_2_b2b2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_2_b2bG2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_2_bG2bG2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_alloc(spectrum_4_b2b2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_4_b2bG2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    class_alloc(spectrum_4_bG2bG2_at_z,
+                pnlpt->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+
+    if (pnlpt->method == nlpt_none && pnl->method != nl_none){
+    class_call(spectra_pk_nl_at_z(pba,
+                                psp,
+                                logarithmic,
+                                z,
+                                spectrum_at_z),
+             psp->error_message,
              psp->error_message);
+    }
+
+/*Correspondance between requested redshift z and number of value in z_pk input*/
+int i_z;
+for (i_z=0; i_z<pnlpt->z_pk_num; i_z++) {  
+  if (pnlpt->z_pk[i_z] == z)
+    break;
+  if (i_z == pnlpt->z_pk_num-1) 
+    printf("\nRequested redshift z=%e is not calculated by class. Please check input class parameter z_pk.\n",z);
+}
+/*printf("i_z=%d\n",i_z);*/
+    
+    if(pnlpt->method != nlpt_none && pnl->method == nl_none){
+       class_call(spectra_pk_nl_bias_at_z_i(pba,
+                                  pnlpt,
+                                  psp,
+                                  logarithmic,
+                                  i_z,
+                                  spectrum_at_z,
+                                  spectrum_Id2d2_at_z,
+                                  spectrum_Id2_at_z,
+                                       spectrum_IG2_at_z,
+                                       spectrum_Id2G2_at_z,
+                                       spectrum_IG2G2_at_z,
+                                       spectrum_IFG2_at_z,
+                                            spectrum_IFG2_0b1_at_z,
+                                            spectrum_IFG2_0_at_z,
+                                            spectrum_IFG2_2_at_z,
+                                       spectrum_CTR_at_z,
+                                            spectrum_CTR_0_at_z,
+                                            spectrum_CTR_2_at_z,
+                                            spectrum_CTR_4_at_z,
+                               spectrum_Tree_at_z,
+                                            spectrum_Tree_0_vv_at_z,
+                                            spectrum_Tree_0_vd_at_z,
+                                            spectrum_Tree_0_dd_at_z,
+                                            spectrum_Tree_2_vv_at_z,
+                                            spectrum_Tree_2_vd_at_z,
+                                            spectrum_Tree_4_vv_at_z,
+                                            spectrum_0_vv_at_z,
+                                            spectrum_0_vd_at_z,
+                                            spectrum_0_dd_at_z,
+                                            spectrum_2_vv_at_z,
+                                            spectrum_2_vd_at_z,
+                                            spectrum_2_dd_at_z,
+                                            spectrum_4_vv_at_z,
+                                            spectrum_4_vd_at_z,
+                                            spectrum_4_dd_at_z,
+                                            spectrum_0_b1b2_at_z,
+                                            spectrum_0_b2_at_z,
+                                            spectrum_0_b1bG2_at_z,
+                                            spectrum_0_bG2_at_z,
+                                            spectrum_2_b1b2_at_z,
+                                            spectrum_2_b2_at_z,
+                                            spectrum_2_b1bG2_at_z,
+                                            spectrum_2_bG2_at_z,
+                                            spectrum_4_b2_at_z,
+                                            spectrum_4_bG2_at_z,
+                                            spectrum_4_b1b2_at_z,
+                                            spectrum_4_b1bG2_at_z,
+                                            spectrum_2_b2b2_at_z,
+                                            spectrum_2_b2bG2_at_z,
+                                            spectrum_2_bG2bG2_at_z,
+                                            spectrum_4_b2b2_at_z,
+                                            spectrum_4_b2bG2_at_z,
+                                            spectrum_4_bG2bG2_at_z),
+               psp->error_message,
+               psp->error_message);
+
+    }
+    
+
+  /** - get its second derivatives with spline, then interpolate, then convert to linear format */
+
+  class_alloc(spline,
+              sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+              psp->error_message);
+    
+    class_alloc(spline_Id2d2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_Id2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_IG2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_Id2G2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_IG2G2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_IFG2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_IFG2_0b1,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_IFG2_0,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_IFG2_2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_CTR,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_CTR_0,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_CTR_2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+
+    class_alloc(spline_CTR_4,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_Tree,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_Tree_0_vv,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    class_alloc(spline_Tree_0_vd,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    class_alloc(spline_Tree_0_dd,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    class_alloc(spline_Tree_2_vv,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    class_alloc(spline_Tree_2_vd,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    class_alloc(spline_Tree_4_vv,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_0_vv,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_0_vd,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_0_dd,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_2_vv,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_2_vd,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_2_dd,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_4_vv,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_4_vd,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_4_dd,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+
+    class_alloc(spline_0_b1b2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_0_b2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_0_b1bG2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_0_bG2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    
+    class_alloc(spline_2_b1b2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_2_b2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_2_b1bG2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_2_bG2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_4_b2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_4_bG2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_4_b1b2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_4_b1bG2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_2_b2b2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    class_alloc(spline_2_b2bG2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    class_alloc(spline_2_bG2bG2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+    class_alloc(spline_4_b2b2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    class_alloc(spline_4_b2bG2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    class_alloc(spline_4_bG2bG2,
+                sizeof(double)*psp->ic_ic_size[index_md]*pnlpt->ln_k_size,
+                psp->error_message);
+    
+  class_call(array_spline_table_lines(pnlpt->ln_k,
+                                      pnlpt->ln_k_size,
+                                      spectrum_at_z,
+                                      1,
+                                      spline,
+                                      _SPLINE_NATURAL_,
+                                      psp->error_message),
+             psp->error_message,
+             psp->error_message);
+
+  class_call(array_interpolate_spline(pnlpt->ln_k,
+                                      pnlpt->ln_k_size,
+                                      spectrum_at_z,
+                                      spline,
+                                      1,
+                                      log(k),
+                                      &last_index,
+                                      pk_tot,
+                                      1,
+                                      psp->error_message),
+             psp->error_message,
+             psp->error_message);
+
+  *pk_tot = exp(*pk_tot);
+     free(spectrum_at_z);
+      free(spline);
+    
+    // Id2d2
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Id2d2_at_z,
+                                        1,
+                                        spline_Id2d2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Id2d2_at_z,
+                                        spline_Id2d2,
+                                        1,
+                                        log(k),
+                                        &last_index2,
+                                        pk_tot_Id2d2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_Id2d2 = exp(*pk_tot_Id2d2);
+    
+  free(spectrum_Id2d2_at_z);
+  free(spline_Id2d2);
+    
+    // Id2
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Id2_at_z,
+                                        1,
+                                        spline_Id2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Id2_at_z,
+                                        spline_Id2,
+                                        1,
+                                        log(k),
+                                        &last_index3,
+                                        pk_tot_Id2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_Id2 = exp(*pk_tot_Id2);
+    
+    free(spectrum_Id2_at_z);
+    free(spline_Id2);
+    
+    
+    // IG2
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_IG2_at_z,
+                                        1,
+                                        spline_IG2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_IG2_at_z,
+                                        spline_IG2,
+                                        1,
+                                        log(k),
+                                        &last_index4,
+                                        pk_tot_IG2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_IG2 = exp(*pk_tot_IG2);
+    
+    free(spectrum_IG2_at_z);
+    free(spline_IG2);
+    
+    
+    
+    // Id2G2
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Id2G2_at_z,
+                                        1,
+                                        spline_Id2G2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Id2G2_at_z,
+                                        spline_Id2G2,
+                                        1,
+                                        log(k),
+                                        &last_index5,
+                                        pk_tot_Id2G2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_Id2G2 = exp(*pk_tot_Id2G2);
+    
+    free(spectrum_Id2G2_at_z);
+    free(spline_Id2G2);
+    
+    
+    // IG2G2
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_IG2G2_at_z,
+                                        1,
+                                        spline_IG2G2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_IG2G2_at_z,
+                                        spline_IG2G2,
+                                        1,
+                                        log(k),
+                                        &last_index6,
+                                        pk_tot_IG2G2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_IG2G2 = exp(*pk_tot_IG2G2);
+    
+    free(spectrum_IG2G2_at_z);
+    free(spline_IG2G2);
+    
+    
+    // IFG2
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_IFG2_at_z,
+                                        1,
+                                        spline_IFG2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_IFG2_at_z,
+                                        spline_IFG2,
+                                        1,
+                                        log(k),
+                                        &last_index7,
+                                        pk_tot_IFG2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_IFG2 = exp(*pk_tot_IFG2);
+    
+    free(spectrum_IFG2_at_z);
+    free(spline_IFG2);
+    
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_IFG2_0b1_at_z,
+                                        1,
+                                        spline_IFG2_0b1,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_IFG2_0b1_at_z,
+                                        spline_IFG2_0b1,
+                                        1,
+                                        log(k),
+                                        &last_index7,
+                                        pk_tot_IFG2_0b1,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_IFG2_0b1 = exp(*pk_tot_IFG2_0b1);
+    
+    free(spectrum_IFG2_0b1_at_z);
+    free(spline_IFG2_0b1);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_IFG2_0_at_z,
+                                        1,
+                                        spline_IFG2_0,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_IFG2_0_at_z,
+                                        spline_IFG2_0,
+                                        1,
+                                        log(k),
+                                        &last_index7,
+                                        pk_tot_IFG2_0,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_IFG2_0 = exp(*pk_tot_IFG2_0);
+    
+    free(spectrum_IFG2_0_at_z);
+    free(spline_IFG2_0);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_IFG2_2_at_z,
+                                        1,
+                                        spline_IFG2_2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_IFG2_2_at_z,
+                                        spline_IFG2_2,
+                                        1,
+                                        log(k),
+                                        &last_index7,
+                                        pk_tot_IFG2_2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_IFG2_2 = exp(*pk_tot_IFG2_2);
+    
+    free(spectrum_IFG2_2_at_z);
+    free(spline_IFG2_2);
+    
+    
+    // CTR
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_CTR_at_z,
+                                        1,
+                                        spline_CTR,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_CTR_at_z,
+                                        spline_CTR,
+                                        1,
+                                        log(k),
+                                        &last_index8,
+                                        pk_tot_CTR,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_CTR = exp(*pk_tot_CTR);
+    
+    free(spectrum_CTR_at_z);
+    free(spline_CTR);
+    
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_CTR_0_at_z,
+                                        1,
+                                        spline_CTR_0,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_CTR_0_at_z,
+                                        spline_CTR_0,
+                                        1,
+                                        log(k),
+                                        &last_index8,
+                                        pk_tot_CTR_0,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_CTR_0 = exp(*pk_tot_CTR_0);
+    
+    free(spectrum_CTR_0_at_z);
+    free(spline_CTR_0);
+    
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_CTR_2_at_z,
+                                        1,
+                                        spline_CTR_2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_CTR_2_at_z,
+                                        spline_CTR_2,
+                                        1,
+                                        log(k),
+                                        &last_index8,
+                                        pk_tot_CTR_2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_CTR_2 = exp(*pk_tot_CTR_2);
+    
+    free(spectrum_CTR_2_at_z);
+    free(spline_CTR_2);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_CTR_4_at_z,
+                                        1,
+                                        spline_CTR_4,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_CTR_4_at_z,
+                                        spline_CTR_4,
+                                        1,
+                                        log(k),
+                                        &last_index8,
+                                        pk_tot_CTR_4,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_CTR_4 = exp(*pk_tot_CTR_4);
+    
+    free(spectrum_CTR_4_at_z);
+    free(spline_CTR_4);
+    
+
+   // Tree
+   //
+   //
+   //
+
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_at_z,
+                                        1,
+                                        spline_Tree,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_at_z,
+                                        spline_Tree,
+                                        1,
+                                        log(k),
+                                        &last_index9,
+                                        pk_tot_Tree,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+
+
+    *pk_tot_Tree = exp(*pk_tot_Tree);
+
+    free(spectrum_Tree_at_z);
+    free(spline_Tree);
+    
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_0_vv_at_z,
+                                        1,
+                                        spline_Tree_0_vv,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_0_vv_at_z,
+                                        spline_Tree_0_vv,
+                                        1,
+                                        log(k),
+                                        &last_index9,
+                                        pk_tot_Tree_0_vv,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_Tree_0_vv = exp(*pk_tot_Tree_0_vv);
+    free(spectrum_Tree_0_vv_at_z);
+    free(spline_Tree_0_vv);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_0_vd_at_z,
+                                        1,
+                                        spline_Tree_0_vd,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_0_vd_at_z,
+                                        spline_Tree_0_vd,
+                                        1,
+                                        log(k),
+                                        &last_index9,
+                                        pk_tot_Tree_0_vd,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_Tree_0_vd = exp(*pk_tot_Tree_0_vd);
+    free(spectrum_Tree_0_vd_at_z);
+    free(spline_Tree_0_vd);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_0_dd_at_z,
+                                        1,
+                                        spline_Tree_0_dd,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_0_dd_at_z,
+                                        spline_Tree_0_dd,
+                                        1,
+                                        log(k),
+                                        &last_index9,
+                                        pk_tot_Tree_0_dd,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    
+    *pk_tot_Tree_0_dd = exp(*pk_tot_Tree_0_dd);
+    free(spectrum_Tree_0_dd_at_z);
+    free(spline_Tree_0_dd);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_2_vv_at_z,
+                                        1,
+                                        spline_Tree_2_vv,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_2_vv_at_z,
+                                        spline_Tree_2_vv,
+                                        1,
+                                        log(k),
+                                        &last_index9,
+                                        pk_tot_Tree_2_vv,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    *pk_tot_Tree_2_vv = exp(*pk_tot_Tree_2_vv);
+    free(spectrum_Tree_2_vv_at_z);
+    free(spline_Tree_2_vv);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_2_vd_at_z,
+                                        1,
+                                        spline_Tree_2_vd,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_2_vd_at_z,
+                                        spline_Tree_2_vd,
+                                        1,
+                                        log(k),
+                                        &last_index9,
+                                        pk_tot_Tree_2_vd,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    *pk_tot_Tree_2_vd = exp(*pk_tot_Tree_2_vd);
+    free(spectrum_Tree_2_vd_at_z);
+    free(spline_Tree_2_vd);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_4_vv_at_z,
+                                        1,
+                                        spline_Tree_4_vv,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_Tree_4_vv_at_z,
+                                        spline_Tree_4_vv,
+                                        1,
+                                        log(k),
+                                        &last_index9,
+                                        pk_tot_Tree_4_vv,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    *pk_tot_Tree_4_vv = exp(*pk_tot_Tree_4_vv);
+    free(spectrum_Tree_4_vv_at_z);
+    free(spline_Tree_4_vv);
+    
+    
+    // RSD
+    //
+    //
+    //
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_vv_at_z,
+                                        1,
+                                        spline_0_vv,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_vv_at_z,
+                                        spline_0_vv,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_0_vv,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_0_vv = exp(*pk_tot_0_vv);
+    free(spectrum_0_vv_at_z);
+    free(spline_0_vv);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_vd_at_z,
+                                        1,
+                                        spline_0_vd,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_vd_at_z,
+                                        spline_0_vd,
+                                        1,
+                                        log(k),
+                                        &last_index11,
+                                        pk_tot_0_vd,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_0_vd = exp(*pk_tot_0_vd);
+    free(spectrum_0_vd_at_z);
+    free(spline_0_vd);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_dd_at_z,
+                                        1,
+                                        spline_0_dd,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_dd_at_z,
+                                        spline_0_dd,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_0_dd,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_0_dd = exp(*pk_tot_0_dd);
+    free(spectrum_0_dd_at_z);
+    free(spline_0_dd);
+    
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_vv_at_z,
+                                        1,
+                                        spline_2_vv,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_vv_at_z,
+                                        spline_2_vv,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_2_vv,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_2_vv = exp(*pk_tot_2_vv);
+    free(spectrum_2_vv_at_z);
+    free(spline_2_vv);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_vd_at_z,
+                                        1,
+                                        spline_2_vd,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_vd_at_z,
+                                        spline_2_vd,
+                                        1,
+                                        log(k),
+                                        &last_index11,
+                                        pk_tot_2_vd,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_2_vd = exp(*pk_tot_2_vd);
+    free(spectrum_2_vd_at_z);
+    free(spline_2_vd);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_dd_at_z,
+                                        1,
+                                        spline_2_dd,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_dd_at_z,
+                                        spline_2_dd,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_2_dd,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_2_dd = exp(*pk_tot_2_dd);
+    free(spectrum_2_dd_at_z);
+    free(spline_2_dd);
+
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_4_vv_at_z,
+                                        1,
+                                        spline_4_vv,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_4_vv_at_z,
+                                        spline_4_vv,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_4_vv,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_4_vv = exp(*pk_tot_4_vv);
+    free(spectrum_4_vv_at_z);
+    free(spline_4_vv);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_4_vd_at_z,
+                                        1,
+                                        spline_4_vd,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_4_vd_at_z,
+                                        spline_4_vd,
+                                        1,
+                                        log(k),
+                                        &last_index11,
+                                        pk_tot_4_vd,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_4_vd = exp(*pk_tot_4_vd);
+    free(spectrum_4_vd_at_z);
+    free(spline_4_vd);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_4_dd_at_z,
+                                        1,
+                                        spline_4_dd,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_4_dd_at_z,
+                                        spline_4_dd,
+                                        1,
+                                        log(k),
+                                        &last_index11,
+                                        pk_tot_4_dd,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_4_dd = exp(*pk_tot_4_dd);
+    free(spectrum_4_dd_at_z);
+    free(spline_4_dd);
+
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_b1b2_at_z,
+                                        1,
+                                        spline_0_b1b2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_b1b2_at_z,
+                                        spline_0_b1b2,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_0_b1b2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_0_b1b2 = exp(*pk_tot_0_b1b2);
+    free(spectrum_0_b1b2_at_z);
+    free(spline_0_b1b2);
+    
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_b2_at_z,
+                                        1,
+                                        spline_0_b2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_b2_at_z,
+                                        spline_0_b2,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_0_b2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_0_b2 = exp(*pk_tot_0_b2);
+    free(spectrum_0_b2_at_z);
+    free(spline_0_b2);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_b1bG2_at_z,
+                                        1,
+                                        spline_0_b1bG2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_b1bG2_at_z,
+                                        spline_0_b1bG2,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_0_b1bG2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_0_b1bG2 = exp(*pk_tot_0_b1bG2);
+    free(spectrum_0_b1bG2_at_z);
+    free(spline_0_b1bG2);
+    
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_bG2_at_z,
+                                        1,
+                                        spline_0_bG2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_0_bG2_at_z,
+                                        spline_0_bG2,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_0_bG2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_0_bG2 = exp(*pk_tot_0_bG2);
+    free(spectrum_0_bG2_at_z);
+    free(spline_0_bG2);
+    
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_b1b2_at_z,
+                                        1,
+                                        spline_2_b1b2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_b1b2_at_z,
+                                        spline_2_b1b2,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_2_b1b2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_2_b1b2 = exp(*pk_tot_2_b1b2);
+    free(spectrum_2_b1b2_at_z);
+    free(spline_2_b1b2);
+    
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_b2_at_z,
+                                        1,
+                                        spline_2_b2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_b2_at_z,
+                                        spline_2_b2,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_2_b2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_2_b2 = exp(*pk_tot_2_b2);
+    free(spectrum_2_b2_at_z);
+    free(spline_2_b2);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_b1bG2_at_z,
+                                        1,
+                                        spline_2_b1bG2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_b1bG2_at_z,
+                                        spline_2_b1bG2,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_2_b1bG2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_2_b1bG2 = exp(*pk_tot_2_b1bG2);
+    free(spectrum_2_b1bG2_at_z);
+    free(spline_2_b1bG2);
+    
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_bG2_at_z,
+                                        1,
+                                        spline_2_bG2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_2_bG2_at_z,
+                                        spline_2_bG2,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_2_bG2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_2_bG2 = exp(*pk_tot_2_bG2);
+    free(spectrum_2_bG2_at_z);
+    free(spline_2_bG2);
+    
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_4_b2_at_z,
+                                        1,
+                                        spline_4_b2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_4_b2_at_z,
+                                        spline_4_b2,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_4_b2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_4_b2 = exp(*pk_tot_4_b2);
+    free(spectrum_4_b2_at_z);
+    free(spline_4_b2);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_4_bG2_at_z,
+                                        1,
+                                        spline_4_bG2,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(pnlpt->ln_k,
+                                        pnlpt->ln_k_size,
+                                        spectrum_4_bG2_at_z,
+                                        spline_4_bG2,
+                                        1,
+                                        log(k),
+                                        &last_index10,
+                                        pk_tot_4_bG2,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot_4_bG2 = exp(*pk_tot_4_bG2);
+    free(spectrum_4_bG2_at_z);
+    free(spline_4_bG2);
+
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_4_b1b2_at_z,1,spline_4_b1b2,_SPLINE_NATURAL_,psp->error_message),psp->error_message,psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_4_b1b2_at_z,spline_4_b1b2,1,log(k),&last_index10,pk_tot_4_b1b2,1,psp->error_message),psp->error_message,psp->error_message);
+    *pk_tot_4_b1b2 = exp(*pk_tot_4_b1b2);
+    free(spectrum_4_b1b2_at_z);
+    free(spline_4_b1b2);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_4_b1bG2_at_z,1,spline_4_b1bG2,_SPLINE_NATURAL_,psp->error_message),psp->error_message,psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_4_b1bG2_at_z,spline_4_b1bG2,1,log(k),&last_index10,pk_tot_4_b1bG2,1,psp->error_message),psp->error_message,psp->error_message);
+    *pk_tot_4_b1bG2 = exp(*pk_tot_4_b1bG2);
+    free(spectrum_4_b1bG2_at_z);
+    free(spline_4_b1bG2);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_2_b2b2_at_z,1,spline_2_b2b2,_SPLINE_NATURAL_,psp->error_message),psp->error_message,psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_2_b2b2_at_z,spline_2_b2b2,1,log(k),&last_index10,pk_tot_2_b2b2,1,psp->error_message),psp->error_message,psp->error_message);
+    *pk_tot_2_b2b2 = exp(*pk_tot_2_b2b2);
+    free(spectrum_2_b2b2_at_z);
+    free(spline_2_b2b2);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_2_b2bG2_at_z,1,spline_2_b2bG2,_SPLINE_NATURAL_,psp->error_message),psp->error_message,psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_2_b2bG2_at_z,spline_2_b2bG2,1,log(k),&last_index10,pk_tot_2_b2bG2,1,psp->error_message),psp->error_message,psp->error_message);
+    *pk_tot_2_b2bG2 = exp(*pk_tot_2_b2bG2);
+    free(spectrum_2_b2bG2_at_z);
+    free(spline_2_b2bG2);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_2_bG2bG2_at_z,1,spline_2_bG2bG2,_SPLINE_NATURAL_,psp->error_message),psp->error_message,psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_2_bG2bG2_at_z,spline_2_bG2bG2,1,log(k),&last_index10,pk_tot_2_bG2bG2,1,psp->error_message),psp->error_message,psp->error_message);
+    *pk_tot_2_bG2bG2 = exp(*pk_tot_2_bG2bG2);
+    free(spectrum_2_bG2bG2_at_z);
+    free(spline_2_bG2bG2);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_4_b2b2_at_z,1,spline_4_b2b2,_SPLINE_NATURAL_,psp->error_message),psp->error_message,psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_4_b2b2_at_z,spline_4_b2b2,1,log(k),&last_index10,pk_tot_4_b2b2,1,psp->error_message),psp->error_message,psp->error_message);
+    *pk_tot_4_b2b2 = exp(*pk_tot_4_b2b2);
+    free(spectrum_4_b2b2_at_z);
+    free(spline_4_b2b2);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_4_b2bG2_at_z,1,spline_4_b2bG2,_SPLINE_NATURAL_,psp->error_message),psp->error_message,psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_4_b2bG2_at_z,spline_4_b2bG2,1,log(k),&last_index10,pk_tot_4_b2bG2,1,psp->error_message),psp->error_message,psp->error_message);
+    *pk_tot_4_b2bG2 = exp(*pk_tot_4_b2bG2);
+    free(spectrum_4_b2bG2_at_z);
+    free(spline_4_b2bG2);
+    
+    class_call(array_spline_table_lines(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_4_bG2bG2_at_z,1,spline_4_bG2bG2,_SPLINE_NATURAL_,psp->error_message),psp->error_message,psp->error_message);
+    class_call(array_interpolate_spline(pnlpt->ln_k,pnlpt->ln_k_size,spectrum_4_bG2bG2_at_z,spline_4_bG2bG2,1,log(k),&last_index10,pk_tot_4_bG2bG2,1,psp->error_message),psp->error_message,psp->error_message);
+    *pk_tot_4_bG2bG2 = exp(*pk_tot_4_bG2bG2);
+    free(spectrum_4_bG2bG2_at_z);
+    free(spline_4_bG2bG2);
 
   return _SUCCESS_;
 
@@ -1543,24 +3899,90 @@ int spectra_sigma(
                   double * sigma
                   ) {
 
-  fprintf(stderr," -> [WARNING:] You are calling the function spectra_sigma() which is deprecated since v2.8. Try using nonlinear_sigmas_at_z() instead.\n");
+  double pk;
+  double * pk_ic = NULL;
 
-  if (psp->pnl->has_pk_m) {
+  double * array_for_sigma;
+  int index_num;
+  int index_k;
+  int index_y;
+  int index_ddy;
+  int i;
 
-    class_call(nonlinear_sigma_at_z(pba,
-                                    psp->pnl,
-                                    R,
-                                    z,
-                                    psp->pnl->index_pk_m,
-                                    80., // hardcoded, yes, but the function is deprecated...
-                                    sigma),
-               psp->pnl->error_message,
+  double k,W,x;
+
+  if (psp->ic_ic_size[psp->index_md_scalars]>1)
+    class_alloc(pk_ic,
+                psp->ic_ic_size[psp->index_md_scalars]*sizeof(double),
+                psp->error_message);
+
+  i=0;
+  index_k=i;
+  i++;
+  index_y=i;
+  i++;
+  index_ddy=i;
+  i++;
+  index_num=i;
+
+  class_alloc(array_for_sigma,
+              psp->ln_k_size*index_num*sizeof(double),
+              psp->error_message);
+
+  for (i=0;i<psp->ln_k_size;i++) {
+    k=exp(psp->ln_k[i]);
+    if (i == (psp->ln_k_size-1)) k *= 0.9999999; // to prevent rounding error leading to k being bigger than maximum value
+    x=k*R;
+    W=3./x/x/x*(sin(x)-x*cos(x));
+    class_call(spectra_pk_at_k_and_z(pba,ppm,psp,k,z,&pk,pk_ic),
+               psp->error_message,
                psp->error_message);
-
+    array_for_sigma[i*index_num+index_k]=k;
+    array_for_sigma[i*index_num+index_y]=k*k*pk*W*W;
   }
 
+  class_call(array_spline(array_for_sigma,
+                          index_num,
+                          psp->ln_k_size,
+                          index_k,
+                          index_y,
+                          index_ddy,
+                          _SPLINE_EST_DERIV_,
+                          psp->error_message),
+             psp->error_message,
+             psp->error_message);
+
+  class_call(array_integrate_all_spline(array_for_sigma,
+                                        index_num,
+                                        psp->ln_k_size,
+                                        index_k,
+                                        index_y,
+                                        index_ddy,
+                                        sigma,
+                                        psp->error_message),
+             psp->error_message,
+             psp->error_message);
+
+  free(array_for_sigma);
+
+  if (psp->ic_ic_size[psp->index_md_scalars]>1)
+    free(pk_ic);
+
+  *sigma = sqrt(*sigma/(2.*_PI_*_PI_));
+
   return _SUCCESS_;
+
 }
+
+/**
+ * This routine computes a table of values for all matter power spectra P(k),
+ * given the source functions and primordial spectra.
+ *
+ * @param pba Input: pointer to background structure (will provide density of each species)
+ * @param ppt Input: pointer to perturbation structure (contain source functions)
+ * @param psp Input/Output: pointer to spectra structure
+ * @return the error status
+ */
 
 /**
  * This routine computes sigma(R) given P(k) for baryon+cdm power
@@ -1604,7 +4026,101 @@ int spectra_sigma_cb(
   return _SUCCESS_;
 }
 
-  /* deprecated functions (since v2.1) */
+int find_minimum(int a[], int n) {
+  int c, min, index;
+ 
+  min = a[0];
+  index = 0;
+ 
+  for (c = 1; c < n; c++) {
+    if (a[c] < min) {
+       index = c;
+       min = a[c];
+    }
+  }
+ 
+  return index;
+}
+
+int spectra_pk_nl_halofit_at_k_and_z(
+                             struct background * pba,
+                             struct primordial * ppm,
+                             struct spectra * psp,
+                             double k,
+                             double z,
+                             double * pk_tot /* pointer to a single number (must be already allocated) */
+                             ) {
+    
+    /** Summary: */
+    
+    /** - define local variables */
+    
+    
+    int index_md;
+    int last_index;
+    
+    double * spectrum_at_z = NULL;
+    double * spline;
+
+    
+    index_md = psp->index_md_scalars;
+    
+    /** - check that k is in valid range [0:kmax] (the test for z will be done when calling spectra_pk_at_z()) */
+    
+    class_test((k < exp(psp->ln_k[0])) || (k > exp(psp->ln_k[psp->ln_k_size-1])),
+               psp->error_message,
+               "k=%e out of bounds [%e:%e]",k,0.,exp(psp->ln_k[psp->ln_k_size-1]));
+    
+    /** - compute P(k,z) (in logarithmic format for more accurate interpolation) */
+    class_alloc(spectrum_at_z,
+                psp->ln_k_size*sizeof(double),
+                psp->error_message);
+    
+    class_call(spectra_pk_nl_at_z(pba,
+                                  psp,
+                                  logarithmic,
+                                  z,
+                                  spectrum_at_z),
+               psp->error_message,
+               psp->error_message);
+    
+    /** - get its second derivatives with spline, then interpolate, then convert to linear format */
+    
+    class_alloc(spline,
+                sizeof(double)*psp->ic_ic_size[index_md]*psp->ln_k_size,
+                psp->error_message);
+    
+    class_call(array_spline_table_lines(psp->ln_k,
+                                        psp->ln_k_size,
+                                        spectrum_at_z,
+                                        1,
+                                        spline,
+                                        _SPLINE_NATURAL_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    class_call(array_interpolate_spline(psp->ln_k,
+                                        psp->ln_k_size,
+                                        spectrum_at_z,
+                                        spline,
+                                        1,
+                                        log(k),
+                                        &last_index,
+                                        pk_tot,
+                                        1,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+    
+    *pk_tot = exp(*pk_tot);
+    free(spectrum_at_z);
+    free(spline);
+    
+    return _SUCCESS_;
+    
+}
+
 
 /**
  * Obsolete function, superseeded by perturb_sources_at_tau()
@@ -1612,6 +4128,7 @@ int spectra_sigma_cb(
  *
  * @param pba        Input: pointer to background structure (used for converting z into tau)
  * @param psp        Input: pointer to spectra structure (containing pre-computed table)
+ * @param k          Input: wavenumber in 1/Mpc
  * @param z          Input: redshift
  * @param output     Output: matter transfer functions
  * @return the error status
@@ -1624,17 +4141,84 @@ int spectra_tk_at_z(
                     double * output /* array with argument output[(index_k*psp->ic_size[index_md]+index_ic)*psp->tr_size+index_tr] (must be already allocated) */
                     ) {
 
+  /** Summary: */
 
-  class_stop(psp->error_message,
-             "The function spectra_tk_at_z() is obsolete, use instead perturb_sources_at_tau(), it does the same");
+  /** - define local variables */
+
+  int index_md;
+  int last_index;
+  int index_k;
+  int index_tr;
+  double tau,ln_tau;
+  int index_ic;
+
+  index_md = psp->index_md_scalars;
+
+  /** - first step: convert z into ln(tau) */
+
+  class_call(background_tau_of_z(pba,z,&tau),
+             pba->error_message,
+             psp->error_message);
+
+  class_test(tau <= 0.,
+             psp->error_message,
+             "negative or null value of conformal time: cannot interpolate");
+
+  ln_tau = log(tau);
+
+  /** - second step: store the matter transfer functions in the output array */
+
+  /** - --> (a) if only values at tau=tau_today are stored and we want \f$ T_i(k,z=0)\f$, no need to interpolate */
+
+  if (psp->ln_tau_size == 1) {
+
+    class_test(z != 0.,
+               psp->error_message,
+               "asked z=%e but only T_i(k,z=0) has been tabulated",z);
+
+    for (index_k=0; index_k<psp->ln_k_size; index_k++)
+      for (index_tr=0; index_tr<psp->tr_size; index_tr++)
+        for (index_ic = 0; index_ic < psp->ic_size[index_md]; index_ic++)
+          output[(index_k*psp->ic_size[index_md]+index_ic)*psp->tr_size+index_tr]
+            = psp->matter_transfer[(index_k*psp->ic_size[index_md]+index_ic)*psp->tr_size+index_tr];
+
+  }
+
+  /** - --> (b) if several values of tau have been stored, use interpolation routine to get spectra at correct redshift */
+
+  else {
+
+    class_call(array_interpolate_spline(psp->ln_tau,
+                                        psp->ln_tau_size,
+                                        psp->matter_transfer,
+                                        psp->ddmatter_transfer,
+                                        psp->ic_size[index_md]*psp->tr_size*psp->ln_k_size,
+                                        ln_tau,
+                                        &last_index,
+                                        output,
+                                        psp->ic_size[index_md]*psp->tr_size*psp->ln_k_size,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+
+  }
 
   return _SUCCESS_;
 
 }
 
 /**
- * Obsolete function, superseeded by perturb_sources_at_tau()
- * (at the time of the switch, this function was anyway never used anywhere)
+ * Matter transfer functions \f$ T_i(k)\f$ for arbitrary wavenumber, redshift
+ * and initial condition.
+ *
+ * This routine evaluates the matter transfer functions at a given
+ * value of k and z by interpolating in a table of all \f$ T_i(k,z)\f$'s
+ * computed at this z by spectra_tk_at_z() (when kmin <= k <= kmax).
+ * Returns an error when k<kmin or k > kmax.
+ *
+ * This function can be called from whatever module at whatever time,
+ * provided that spectra_init() has been called before, and
+ * spectra_free() has not been called yet.
  *
  * @param pba        Input: pointer to background structure (used for converting z into tau)
  * @param psp        Input: pointer to spectra structure (containing pre-computed table)
@@ -1652,11 +4236,2029 @@ int spectra_tk_at_k_and_z(
                           double * output  /* array with argument output[index_ic*psp->tr_size+index_tr] (must be already allocated) */
                           ) {
 
-  class_stop(psp->error_message,
-             "The function spectra_tk_at_k_and_z() is obsolete, use instead perturb_sources_at_tau(), it does the same provided that you interpolate its output at some wavenumber k");
+  /** Summary: */
+
+  /** - define local variables */
+
+  int index_md;
+  int last_index;
+  double * tks_at_z;
+  double * ddtks_at_z;
+
+  index_md = psp->index_md_scalars;
+
+  /** - check that k is in valid range [0:kmax] (the test for z will be done when calling spectra_tk_at_z()) */
+
+  class_test((k < 0.) || (k > exp(psp->ln_k[psp->ln_k_size-1])),
+             psp->error_message,
+             "k=%e out of bounds [%e:%e]",k,0.,exp(psp->ln_k[psp->ln_k_size-1]));
+
+  /** - compute T_i(k,z) */
+
+  class_alloc(tks_at_z,
+              psp->ln_k_size*psp->tr_size*psp->ic_size[index_md]*sizeof(double),
+              psp->error_message);
+
+  class_call(spectra_tk_at_z(pba,
+                             psp,
+                             z,
+                             tks_at_z),
+             psp->error_message,
+             psp->error_message);
+
+  /** - get its second derivatives w.r.t. k with spline, then interpolate */
+
+  class_alloc(ddtks_at_z,
+              psp->ln_k_size*psp->tr_size*psp->ic_size[index_md]*sizeof(double),
+              psp->error_message);
+
+  class_call(array_spline_table_lines(psp->ln_k,
+                                      psp->ln_k_size,
+                                      tks_at_z,
+                                      psp->tr_size*psp->ic_size[index_md],
+                                      ddtks_at_z,
+                                      _SPLINE_NATURAL_,
+                                      psp->error_message),
+             psp->error_message,
+             psp->error_message);
+
+  class_call(array_interpolate_spline(psp->ln_k,
+                                      psp->ln_k_size,
+                                      tks_at_z,
+                                      ddtks_at_z,
+                                      psp->tr_size*psp->ic_size[index_md],
+                                      log(k),
+                                      &last_index,
+                                      output,
+                                      psp->tr_size*psp->ic_size[index_md],
+                                      psp->error_message),
+             psp->error_message,
+             psp->error_message);
+
+  free(tks_at_z);
+  free(ddtks_at_z);
 
   return _SUCCESS_;
 
 }
 
-  /* end deprecated functions */
+int spectra_k_and_tau(
+                      struct background * pba,
+                      struct perturbs * ppt,
+                      struct nonlinear_pt *pnlpt,
+                      struct nonlinear *pnl,
+                      struct spectra * psp
+                      ) {
+
+  /** Summary: */
+
+  /** - define local variables */
+
+  int index_k;
+  int index_tau;
+  double tau_min;
+
+  /** - check the presence of scalar modes */
+
+  class_test((ppt->has_scalars == _FALSE_),
+             psp->error_message,
+             "you cannot ask for matter power spectrum since you turned off scalar modes");
+
+  /** - check the maximum redshift z_max_pk at which \f$P(k,z)\f$ and \f$ T_i(k,z)\f$ should be
+      computable by interpolation. If it is equal to zero, only \f$ P(k,z=0)\f$
+      needs to be computed. If it is higher, we will store in a table
+      various P(k,tau) at several values of tau generously encompassing
+      the range 0<z<z_max_pk */
+
+  /* if z_max_pk<0, return error */
+  class_test((psp->z_max_pk < 0),
+             psp->error_message,
+             "asked for negative redshift z=%e",psp->z_max_pk);
+
+  /* if z_max_pk=0, there is just one value to store */
+  if (psp->z_max_pk == 0.) {
+    psp->ln_tau_size=1;
+  }
+
+  /* if z_max_pk>0, store several values (with a comfortable margin above z_max_pk) in view of interpolation */
+  else{
+
+    /* find the first relevant value of tau (last value in the table tau_ampling before tau(z_max)) and infer the number of values of tau at which P(k) must be stored */
+
+    class_call(background_tau_of_z(pba,psp->z_max_pk,&tau_min),
+               pba->error_message,
+               psp->error_message);
+
+    index_tau=0;
+    class_test((tau_min <= ppt->tau_sampling[index_tau]),
+               psp->error_message,
+               "you asked for zmax=%e, i.e. taumin=%e, smaller than or equal to the first possible value =%e; it should be strictly bigger for a successfull interpolation",psp->z_max_pk,tau_min,ppt->tau_sampling[0]);
+
+    while (ppt->tau_sampling[index_tau] < tau_min){
+      index_tau++;
+    }
+    index_tau --;
+    class_test(index_tau<0,
+               psp->error_message,
+               "by construction, this should never happen, a bug must have been introduced somewhere");
+
+    /* whenever possible, take a few more values in to avoid boundary effects in the interpolation */
+    if (index_tau>0) index_tau--;
+    if (index_tau>0) index_tau--;
+    if (index_tau>0) index_tau--;
+    if (index_tau>0) index_tau--;
+    psp->ln_tau_size=ppt->tau_size-index_tau;
+    //printf("ln_tau_size=%d, tau_size=%d\n",psp->ln_tau_size,ppt->tau_size);
+  }
+
+  /** - allocate and fill table of tau values at which \f$P(k,\tau)\f$ and \f$T_i(k,\tau)\f$ are stored */
+
+  class_alloc(psp->ln_tau,sizeof(double)*psp->ln_tau_size,psp->error_message);
+
+  for (index_tau=0; index_tau<psp->ln_tau_size; index_tau++) {
+    psp->ln_tau[index_tau]=log(ppt->tau_sampling[index_tau-psp->ln_tau_size+ppt->tau_size]);
+  }
+
+  /** - allocate and fill table of k values at which \f$ P(k,\tau)\f$ is stored */
+
+  psp->ln_k_size = ppt->k_size[ppt->index_md_scalars];
+  class_alloc(psp->ln_k,sizeof(double)*psp->ln_k_size,psp->error_message);
+
+  for (index_k=0; index_k<psp->ln_k_size; index_k++) {
+    class_test(ppt->k[ppt->index_md_scalars][index_k] <= 0.,
+               psp->error_message,
+               "stop to avoid segmentation fault");
+    psp->ln_k[index_k]=log(ppt->k[ppt->index_md_scalars][index_k]);
+  }
+
+  /** - if the non-linear power spectrum is requested, we should store
+        it only at values of tau where non-linear corrections were
+        really computed and not brutally set to one. Hence we must
+        find here ln_tau_nl_size which might be smaller than
+        ln_tau_size. But the same table ln_tau will be used for
+        both. */
+
+  if (pnlpt->method != nlpt_none && pnl->method == nl_none) {
+    pnlpt->index_tau_min_nl=0;
+    index_tau=ppt->tau_size-psp->ln_tau_size;
+    //printf("pnlpt->index_tau_min_nl=%d\n",pnlpt->index_tau_min_nl);
+    while (ppt->tau_sampling[index_tau] < pnlpt->tau[pnlpt->index_tau_min_nl]) {
+      index_tau++;
+    }
+    psp->ln_tau_nl_size=ppt->tau_size-index_tau;
+
+    //printf("ln_tau_nl_size=%d\n",psp->ln_tau_nl_size);
+
+    class_alloc(psp->ln_tau_nl,sizeof(double)*psp->ln_tau_nl_size,psp->error_message);
+
+    for (index_tau=0; index_tau<psp->ln_tau_nl_size; index_tau++) {
+      psp->ln_tau_nl[index_tau]=log(ppt->tau_sampling[index_tau-psp->ln_tau_nl_size+ppt->tau_size]);
+    }
+
+  }
+    
+//        printf("Everything is OK in 'spectra_k_and_tau'\n");
+    
+    
+    if (pnl->method != nl_none && pnlpt->method == nlpt_none) {
+        
+        index_tau=ppt->tau_size-psp->ln_tau_size;
+        while (ppt->tau_sampling[index_tau] < pnl->tau[pnl->index_tau_min_nl]) {
+            index_tau++;
+        }
+        psp->ln_tau_nl_size=ppt->tau_size-index_tau;
+        
+        class_alloc(psp->ln_tau_nl,sizeof(double)*psp->ln_tau_nl_size,psp->error_message);
+        
+        for (index_tau=0; index_tau<psp->ln_tau_nl_size; index_tau++) {
+            psp->ln_tau_nl[index_tau]=log(ppt->tau_sampling[index_tau-psp->ln_tau_nl_size+ppt->tau_size]);
+        }
+        
+    }
+    
+  return _SUCCESS_;
+}
+
+int spectra_pk(
+               struct background * pba,
+               struct perturbs * ppt,
+               struct primordial * ppm,
+               struct nonlinear_pt *pnlpt,
+               struct nonlinear *pnl,
+               struct spectra * psp
+               ) {
+
+  /** Summary: */
+
+  /** - define local variables */
+
+  int index_md;
+  int index_ic1,index_ic2,index_ic1_ic1,index_ic2_ic2,index_ic1_ic2;
+  int index_k;
+  int index_tau;
+  int delta_index_nl=0;
+  double * primordial_pk; /* array with argument primordial_pk[index_ic_ic] */
+  double source_ic1;
+  double source_ic2;
+  double pk_tot=0.,ln_pk_tot=0.;
+
+  /** - check the presence of scalar modes */
+
+  class_test((ppt->has_scalars == _FALSE_),
+             psp->error_message,
+             "you cannot ask for matter power spectrum since you turned off scalar modes");
+
+  index_md = psp->index_md_scalars;
+
+  /** - allocate temporary vectors where the primordial spectrum and the background quantities will be stored */
+
+  class_alloc(primordial_pk,psp->ic_ic_size[index_md]*sizeof(double),psp->error_message);
+
+  /** - allocate and fill array of \f$P(k,\tau)\f$ values */
+
+  class_alloc(psp->ln_pk,
+              sizeof(double)*psp->ln_tau_size*psp->ln_k_size*psp->ic_ic_size[index_md],
+              psp->error_message);
+
+  class_alloc(psp->ln_pk_l,
+              sizeof(double)*psp->ln_tau_size*psp->ln_k_size,
+              psp->error_message);
+
+    
+    if (pnlpt->method != nlpt_none || pnl->method != nl_none) {
+        
+        if (pnlpt->method != nlpt_none && pnl->method == nl_none) {
+
+            class_alloc(psp->ln_pk_nl,
+                sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                psp->error_message);
+      
+            class_alloc(psp->ln_pk_nl_Id2d2,
+                  sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                  psp->error_message);
+      
+            class_alloc(psp->ln_pk_nl_Id2,
+                  sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                  psp->error_message);
+      
+            class_alloc(psp->ln_pk_nl_IG2,
+                  sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                  psp->error_message);
+      
+            class_alloc(psp->ln_pk_nl_Id2G2,
+                  sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                  psp->error_message);
+      
+            class_alloc(psp->ln_pk_nl_IG2G2,
+                  sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                  psp->error_message);
+      
+            class_alloc(psp->ln_pk_nl_IFG2,
+                  sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                  psp->error_message);
+            
+            class_alloc(psp->ln_pk_nl_IFG2_0b1,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_nl_IFG2_0,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_nl_IFG2_2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+      
+            class_alloc(psp->ln_pk_nl_CTR,
+                  sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                  psp->error_message);
+
+            class_alloc(psp->ln_pk_nl_CTR_0,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_nl_CTR_2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_nl_CTR_4,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_nl_Tree,
+                  sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                  psp->error_message);
+            
+            class_alloc(psp->ln_pk_nl_Tree_0_vv,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_nl_Tree_0_vd,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_nl_Tree_0_dd,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_nl_Tree_2_vv,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_nl_Tree_2_vd,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_nl_Tree_4_vv,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_0_vv,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_0_vd,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_0_dd,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_2_vv,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_2_vd,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_2_dd,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_4_vv,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_4_vd,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_4_dd,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            
+            class_alloc(psp->ln_pk_0_b1b2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_0_b2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_0_b1bG2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_0_bG2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            
+            class_alloc(psp->ln_pk_2_b1b2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_2_b2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_2_b1bG2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_2_bG2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_4_b2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            class_alloc(psp->ln_pk_4_bG2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_4_b1b2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_4_b1bG2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_2_b2b2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            class_alloc(psp->ln_pk_2_b2bG2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            class_alloc(psp->ln_pk_2_bG2bG2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            
+            class_alloc(psp->ln_pk_4_b2b2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            class_alloc(psp->ln_pk_4_b2bG2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+            class_alloc(psp->ln_pk_4_bG2bG2,
+                        sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                        psp->error_message);
+
+
+    /* possible index shift between the first value of time used for
+             the linear spectrum and that for the non-linear power
+             spectrum (0 if no shift) */
+    delta_index_nl = psp->ln_tau_size-psp->ln_tau_nl_size;
+    class_test(delta_index_nl<0,
+               "This should never happen",
+               psp->error_message,
+               psp->error_message);
+    }
+    /*
+  else {
+    psp->ln_pk_nl = NULL;
+    psp->ln_pk_nl_Id2d2 = NULL;
+    psp->ln_pk_nl_Id2 = NULL;
+       psp->ln_pk_nl_IG2 = NULL;
+      psp->ln_pk_nl_Id2G2 = NULL;
+      psp->ln_pk_nl_IG2G2 = NULL;
+      psp->ln_pk_nl_CTR = NULL;
+  }
+     */
+    
+    
+        if (pnlpt->method == nlpt_none && pnl->method != nl_none) {
+        
+        class_alloc(psp->ln_pk_nl,
+                    sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,
+                    psp->error_message);
+        
+        /* possible index shift between the first value of time used for
+         the linear spectrum and that for the non-linear power
+         spectrum (0 if no shift) */
+        delta_index_nl = psp->ln_tau_size-psp->ln_tau_nl_size;
+        class_test(delta_index_nl<0,
+                   "This should never happen",
+                   psp->error_message,
+                   psp->error_message);
+        
+        psp->ln_pk_nl_Id2d2 = NULL;
+        psp->ln_pk_nl_Id2 = NULL;
+        psp->ln_pk_nl_IG2 = NULL;
+        psp->ln_pk_nl_Id2G2 = NULL;
+        psp->ln_pk_nl_IG2G2 = NULL;
+        psp->ln_pk_nl_IFG2 = NULL;
+            psp->ln_pk_nl_IFG2_0b1 = NULL;
+            psp->ln_pk_nl_IFG2_0 = NULL;
+            psp->ln_pk_nl_IFG2_2 = NULL;
+        psp->ln_pk_nl_CTR = NULL;
+                    psp->ln_pk_nl_CTR_0 = NULL;
+                    psp->ln_pk_nl_CTR_2 = NULL;
+                    psp->ln_pk_nl_CTR_4 = NULL;
+            psp->ln_pk_nl_Tree = NULL;
+            psp->ln_pk_nl_Tree_0_vv = NULL;
+            psp->ln_pk_nl_Tree_0_vd = NULL;
+            psp->ln_pk_nl_Tree_0_dd = NULL;
+            psp->ln_pk_nl_Tree_2_vv = NULL;
+            psp->ln_pk_nl_Tree_2_vd = NULL;
+            psp->ln_pk_nl_Tree_4_vv = NULL;
+            psp->ln_pk_0_vv = NULL;
+            psp->ln_pk_0_vd = NULL;
+            psp->ln_pk_0_dd = NULL;
+            psp->ln_pk_2_vv = NULL;
+            psp->ln_pk_2_vd = NULL;
+            psp->ln_pk_2_dd = NULL;
+            psp->ln_pk_4_vv = NULL;
+            psp->ln_pk_4_vd = NULL;
+            psp->ln_pk_4_dd = NULL;
+            psp->ln_pk_0_b1b2 = NULL;
+            psp->ln_pk_0_b2 = NULL;
+            psp->ln_pk_0_b1bG2 = NULL;
+            psp->ln_pk_0_bG2 = NULL;
+            psp->ln_pk_2_b1b2 = NULL;
+            psp->ln_pk_2_b2 = NULL;
+            psp->ln_pk_2_b1bG2 = NULL;
+            psp->ln_pk_2_bG2 = NULL;
+            psp->ln_pk_4_b2 = NULL;
+            psp->ln_pk_4_bG2 = NULL;
+            psp->ln_pk_4_b1b2 = NULL;
+            psp->ln_pk_4_b1bG2 = NULL;
+            psp->ln_pk_2_b2b2 = NULL;
+            psp->ln_pk_2_b2bG2 = NULL;
+            psp->ln_pk_2_bG2bG2 = NULL;
+            psp->ln_pk_4_b2b2 = NULL;
+            psp->ln_pk_4_b2bG2 = NULL;
+            psp->ln_pk_4_bG2bG2 = NULL;
+        }
+    
+    }
+    
+    else {
+        psp->ln_pk_nl = NULL;
+        psp->ln_pk_nl_Id2d2 = NULL;
+        psp->ln_pk_nl_Id2 = NULL;
+        psp->ln_pk_nl_IG2 = NULL;
+        psp->ln_pk_nl_Id2G2 = NULL;
+        psp->ln_pk_nl_IG2G2 = NULL;
+        psp->ln_pk_nl_IFG2 = NULL;
+        psp->ln_pk_nl_IFG2_0b1 = NULL;
+        psp->ln_pk_nl_IFG2_0 = NULL;
+        psp->ln_pk_nl_IFG2_2 = NULL;
+        psp->ln_pk_nl_CTR = NULL;
+        psp->ln_pk_nl_CTR_0 = NULL;
+        psp->ln_pk_nl_CTR_2 = NULL;
+        psp->ln_pk_nl_CTR_4 = NULL;
+      psp->ln_pk_nl_Tree = NULL;
+        psp->ln_pk_nl_Tree_0_vv = NULL;
+        psp->ln_pk_nl_Tree_0_vd = NULL;
+        psp->ln_pk_nl_Tree_0_dd = NULL;
+        psp->ln_pk_nl_Tree_2_vv = NULL;
+        psp->ln_pk_nl_Tree_2_vd = NULL;
+        psp->ln_pk_nl_Tree_4_vv = NULL;
+        psp->ln_pk_0_vv = NULL;
+        psp->ln_pk_0_vd = NULL;
+        psp->ln_pk_0_dd = NULL;
+        psp->ln_pk_2_vv = NULL;
+        psp->ln_pk_2_vd = NULL;
+        psp->ln_pk_2_dd = NULL;
+        psp->ln_pk_4_vv = NULL;
+        psp->ln_pk_4_vd = NULL;
+        psp->ln_pk_4_dd = NULL;
+        psp->ln_pk_0_b1b2 = NULL;
+        psp->ln_pk_0_b2 = NULL;
+        psp->ln_pk_0_b1bG2 = NULL;
+        psp->ln_pk_0_bG2 = NULL;
+        psp->ln_pk_2_b1b2 = NULL;
+        psp->ln_pk_2_b2 = NULL;
+        psp->ln_pk_2_b1bG2 = NULL;
+        psp->ln_pk_2_bG2 = NULL;
+        psp->ln_pk_4_b2 = NULL;
+        psp->ln_pk_4_bG2 = NULL;
+        psp->ln_pk_4_b1b2 = NULL;
+        psp->ln_pk_4_b1bG2 = NULL;
+        psp->ln_pk_2_b2b2 = NULL;
+                psp->ln_pk_2_b2bG2 = NULL;
+                psp->ln_pk_2_bG2bG2 = NULL;
+        psp->ln_pk_4_b2b2 = NULL;
+        psp->ln_pk_4_b2bG2 = NULL;
+        psp->ln_pk_4_bG2bG2 = NULL;
+    }
+    
+    
+//        printf("Everything is OK in 'spectra_pk' 1.5\n");
+    
+
+  for (index_tau=0 ; index_tau < psp->ln_tau_size; index_tau++) {
+    for (index_k=0; index_k<psp->ln_k_size; index_k++) {
+
+      class_call(primordial_spectrum_at_k(ppm,index_md,logarithmic,psp->ln_k[index_k],primordial_pk),
+                 ppm->error_message,
+                 psp->error_message);
+
+      pk_tot =0;
+
+      /* curvature primordial spectrum:
+         P_R(k) = 1/(2pi^2) k^3 <R R>
+         so, primordial curvature correlator:
+         <R R> = (2pi^2) k^-3 P_R(k)
+         so, delta_m correlator:
+         P(k) = <delta_m delta_m> = (2pi^2) k^-3 (source_m)^2 P_R(k)
+
+         For isocurvature or cross adiabatic-isocurvature parts,
+         replace one or two 'R' by 'S_i's */
+
+      /* part diagonal in initial conditions */
+      for (index_ic1 = 0; index_ic1 < psp->ic_size[index_md]; index_ic1++) {
+
+        index_ic1_ic2 = index_symmetric_matrix(index_ic1,index_ic1,psp->ic_size[index_md]);
+
+        source_ic1 = ppt->sources[index_md]
+          [index_ic1 * ppt->tp_size[index_md] + ppt->index_tp_delta_m]
+          [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+        psp->ln_pk[(index_tau * psp->ln_k_size + index_k)* psp->ic_ic_size[index_md] + index_ic1_ic2] =
+          log(2.*_PI_*_PI_/exp(3.*psp->ln_k[index_k])
+              *source_ic1*source_ic1
+              *exp(primordial_pk[index_ic1_ic2]));
+        //printf("source_ic1=%d\n",psp->ic_size[index_md]);
+        pk_tot += exp(psp->ln_pk[(index_tau * psp->ln_k_size + index_k)* psp->ic_ic_size[index_md] + index_ic1_ic2]);
+
+      }
+
+      /* part non-diagonal in initial conditions */
+      for (index_ic1 = 0; index_ic1 < psp->ic_size[index_md]; index_ic1++) {
+        for (index_ic2 = index_ic1+1; index_ic2 < psp->ic_size[index_md]; index_ic2++) {
+
+          index_ic1_ic2 = index_symmetric_matrix(index_ic1,index_ic2,psp->ic_size[index_md]);
+          index_ic1_ic1 = index_symmetric_matrix(index_ic1,index_ic1,psp->ic_size[index_md]);
+          index_ic2_ic2 = index_symmetric_matrix(index_ic2,index_ic2,psp->ic_size[index_md]);
+
+          if (psp->is_non_zero[index_md][index_ic1_ic2] == _TRUE_) {
+
+            source_ic1 = ppt->sources[index_md]
+              [index_ic1 * ppt->tp_size[index_md] + ppt->index_tp_delta_m]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            source_ic2 = ppt->sources[index_md]
+              [index_ic2 * ppt->tp_size[index_md] + ppt->index_tp_delta_m]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            psp->ln_pk[(index_tau * psp->ln_k_size + index_k)* psp->ic_ic_size[index_md] + index_ic1_ic2] =
+              primordial_pk[index_ic1_ic2]*SIGN(source_ic1)*SIGN(source_ic2);
+
+            pk_tot += psp->ln_pk[(index_tau * psp->ln_k_size + index_k)* psp->ic_ic_size[index_md] + index_ic1_ic2]
+              * sqrt(psp->ln_pk[(index_tau * psp->ln_k_size + index_k)* psp->ic_ic_size[index_md] + index_ic1_ic1]
+                     * psp->ln_pk[(index_tau * psp->ln_k_size + index_k)* psp->ic_ic_size[index_md] + index_ic2_ic2]);
+
+
+          }
+          else {
+            psp->ln_pk[(index_tau * psp->ln_k_size + index_k)* psp->ic_ic_size[index_md] + index_ic1_ic2] = 0.;
+          }
+        }
+      }
+
+      ln_pk_tot = log(pk_tot);
+
+      psp->ln_pk_l[index_tau * psp->ln_k_size + index_k] = ln_pk_tot;
+
+      /* if non-linear corrections required, compute the total non-linear matter power spectrum */
+
+        /* Here the non-linear module is being called */
+
+/*Old part -- begin
+      if ((pnlpt->method != nlpt_none) && (pnl->method == nl_none) && (index_tau >= delta_index_nl)) {
+
+        psp->ln_pk_nl[(index_tau-delta_index_nl) * psp->ln_k_size + index_k] =
+          ln_pk_tot
+          + 2.*log(pnlpt->nl_corr_density[(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k]);
+
+          psp->ln_pk_nl_Id2d2[(index_tau-delta_index_nl) * psp->ln_k_size + index_k] =
+          ln_pk_tot
+          + 2.*log(pnlpt->nl_corr_Id2d2[(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k]);
+          
+          psp->ln_pk_nl_Id2[(index_tau-delta_index_nl) * psp->ln_k_size + index_k] =
+          ln_pk_tot
+          + 2.*log(pnlpt->nl_corr_Id2[(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k]);
+          
+          psp->ln_pk_nl_IG2[(index_tau-delta_index_nl) * psp->ln_k_size + index_k] =
+          ln_pk_tot
+          + 2.*log(pnlpt->nl_corr_IG2[(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k]);
+          
+          psp->ln_pk_nl_Id2G2[(index_tau-delta_index_nl) * psp->ln_k_size + index_k] =
+          ln_pk_tot
+          + 2.*log(pnlpt->nl_corr_Id2G2[(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k]);
+          
+          psp->ln_pk_nl_IG2G2[(index_tau-delta_index_nl) * psp->ln_k_size + index_k] =
+          ln_pk_tot
+          + 2.*log(pnlpt->nl_corr_IG2G2[(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k]);
+          
+          psp->ln_pk_nl_CTR[(index_tau-delta_index_nl) * psp->ln_k_size + index_k] =
+          ln_pk_tot
+          + 2.*log(pnlpt->nl_corr_CTR[(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k]);
+          
+          psp->ln_pk_nl_Tree[(index_tau-delta_index_nl) * psp->ln_k_size + index_k] =
+          ln_pk_tot
+          + 2.*log(pnlpt->nl_corr_Tree[(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k]);
+
+               }
+
+Old part -- end*/
+        
+        if ((pnlpt->method == nlpt_none) && (pnl->method != nl_none) && (index_tau >= delta_index_nl)) {
+            
+            psp->ln_pk_nl[(index_tau-delta_index_nl) * psp->ln_k_size + index_k] =
+            ln_pk_tot
+            + 2.*log(pnl->nl_corr_density[(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k]);
+            
+        }
+        
+        
+    }
+  }
+
+  /**- if interpolation of \f$P(k,\tau)\f$ will be needed (as a function of tau),
+     compute array of second derivatives in view of spline interpolation */
+
+  if (psp->ln_tau_size > 1) {
+
+    class_alloc(psp->ddln_pk,sizeof(double)*psp->ln_tau_size*psp->ln_k_size*psp->ic_ic_size[index_md],psp->error_message);
+
+    class_call(array_spline_table_lines(psp->ln_tau,
+                                        psp->ln_tau_size,
+                                        psp->ln_pk,
+                                        psp->ic_ic_size[index_md]*psp->ln_k_size,
+                                        psp->ddln_pk,
+                                        _SPLINE_EST_DERIV_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+
+    class_alloc(psp->ddln_pk_l,sizeof(double)*psp->ln_tau_size*psp->ln_k_size,psp->error_message);
+
+    class_call(array_spline_table_lines(psp->ln_tau,
+                                        psp->ln_tau_size,
+                                        psp->ln_pk_l,
+                                        psp->ln_k_size,
+                                        psp->ddln_pk_l,
+                                        _SPLINE_EST_DERIV_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+
+  }
+
+  /* compute sigma8 (mean variance today in sphere of radius 8/h Mpc */
+
+  class_call(spectra_sigma(pba,ppm,psp,8./pba->h,0.,&(psp->sigma8)),
+             psp->error_message,
+             psp->error_message);
+
+  if (psp->spectra_verbose>0)
+    fprintf(stdout," -> sigma8=%g (computed till k = %g h/Mpc)\n",
+            psp->sigma8,
+            exp(psp->ln_k[psp->ln_k_size-1])/pba->h);
+
+  /**- if interpolation of \f$ P_{NL}(k,\tau)\f$ will be needed (as a function of tau),
+     compute array of second derivatives in view of spline interpolation */
+    
+  if (pnlpt->method != nlpt_none && pnl->method == nl_none) {
+    if (psp->ln_tau_nl_size > 1) {
+
+      class_alloc(psp->ddln_pk_nl,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+
+      class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                          psp->ln_tau_nl_size,
+                                          psp->ln_pk_nl,
+                                          psp->ln_k_size,
+                                          psp->ddln_pk_nl,
+                                          _SPLINE_EST_DERIV_,
+                                          psp->error_message),
+                 psp->error_message,
+                 psp->error_message);
+        
+        
+        class_alloc(psp->ddln_pk_nl_Id2d2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_Id2d2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_Id2d2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        
+        class_alloc(psp->ddln_pk_nl_Id2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_Id2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_Id2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        
+        class_alloc(psp->ddln_pk_nl_IG2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_IG2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_IG2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        
+        class_alloc(psp->ddln_pk_nl_Id2G2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_Id2G2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_Id2G2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        
+        
+        class_alloc(psp->ddln_pk_nl_IG2G2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_IG2G2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_IG2G2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        
+        class_alloc(psp->ddln_pk_nl_IFG2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_IFG2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_IFG2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_nl_IFG2_0b1,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_IFG2_0b1,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_IFG2_0b1,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_nl_IFG2_0,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_IFG2_0,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_IFG2_0,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_nl_IFG2_2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_IFG2_2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_IFG2_2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_nl_CTR,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_CTR,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_CTR,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_nl_CTR_0,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_CTR_0,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_CTR_0,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_nl_CTR_4,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_CTR_4,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_CTR_4,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_nl_CTR_2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_CTR_2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_CTR_2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+
+        class_alloc(psp->ddln_pk_nl_Tree,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_Tree,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_Tree,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_nl_Tree_0_vv,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_Tree_0_vv,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_Tree_0_vv,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        class_alloc(psp->ddln_pk_nl_Tree_0_vd,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_Tree_0_vd,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_Tree_0_vd,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        class_alloc(psp->ddln_pk_nl_Tree_0_dd,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_Tree_0_dd,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_Tree_0_dd,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        class_alloc(psp->ddln_pk_nl_Tree_2_vv,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_Tree_2_vv,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_Tree_2_vv,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        class_alloc(psp->ddln_pk_nl_Tree_2_vd,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_Tree_2_vd,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_Tree_2_vd,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        class_alloc(psp->ddln_pk_nl_Tree_4_vv,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_nl_Tree_4_vv,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_nl_Tree_4_vv,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_0_vv,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_0_vv,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_0_vv,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_0_vd,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_0_vd,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_0_vd,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_0_dd,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_0_dd,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_0_dd,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_2_vv,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_2_vv,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_2_vv,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_2_vd,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_2_vd,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_2_vd,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        
+        class_alloc(psp->ddln_pk_4_vv,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_4_vv,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_4_vv,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_4_vd,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_4_vd,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_4_vd,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_4_dd,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_4_dd,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_4_dd,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        
+        class_alloc(psp->ddln_pk_2_dd,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_2_dd,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_2_dd,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_0_b1b2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_0_b1b2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_0_b1b2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        
+        class_alloc(psp->ddln_pk_0_b1bG2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_0_b1bG2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_0_b1bG2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        
+        class_alloc(psp->ddln_pk_0_b2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_0_b2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_0_b2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_0_bG2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_0_bG2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_0_bG2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        /* Quadrupole starts here */
+        
+        class_alloc(psp->ddln_pk_2_b1b2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_2_b1b2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_2_b1b2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        
+        class_alloc(psp->ddln_pk_2_b1bG2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_2_b1bG2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_2_b1bG2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        
+        class_alloc(psp->ddln_pk_2_b2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_2_b2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_2_b2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_2_bG2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_2_bG2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_2_bG2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        /* Hexadecapole here */
+
+        class_alloc(psp->ddln_pk_4_b2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_4_b2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_4_b2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_4_bG2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                            psp->ln_tau_nl_size,
+                                            psp->ln_pk_4_bG2,
+                                            psp->ln_k_size,
+                                            psp->ddln_pk_4_bG2,
+                                            _SPLINE_EST_DERIV_,
+                                            psp->error_message),
+                   psp->error_message,
+                   psp->error_message);
+        
+        class_alloc(psp->ddln_pk_4_b1b2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,psp->ln_tau_nl_size,psp->ln_pk_4_b1b2,psp->ln_k_size,psp->ddln_pk_4_b1b2,_SPLINE_EST_DERIV_,psp->error_message),psp->error_message,psp->error_message);
+        
+        class_alloc(psp->ddln_pk_4_b1bG2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,psp->ln_tau_nl_size,psp->ln_pk_4_b1bG2,psp->ln_k_size,psp->ddln_pk_4_b1bG2,_SPLINE_EST_DERIV_,psp->error_message),psp->error_message,psp->error_message);
+        
+        class_alloc(psp->ddln_pk_2_b2b2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,psp->ln_tau_nl_size,psp->ln_pk_2_b2b2,psp->ln_k_size,psp->ddln_pk_2_b2b2,_SPLINE_EST_DERIV_,psp->error_message),psp->error_message,psp->error_message);
+        
+        class_alloc(psp->ddln_pk_2_b2bG2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,psp->ln_tau_nl_size,psp->ln_pk_2_b2bG2,psp->ln_k_size,psp->ddln_pk_2_b2bG2,_SPLINE_EST_DERIV_,psp->error_message),psp->error_message,psp->error_message);
+        
+        class_alloc(psp->ddln_pk_2_bG2bG2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,psp->ln_tau_nl_size,psp->ln_pk_2_bG2bG2,psp->ln_k_size,psp->ddln_pk_2_bG2bG2,_SPLINE_EST_DERIV_,psp->error_message),psp->error_message,psp->error_message);
+        
+        class_alloc(psp->ddln_pk_4_b2b2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,psp->ln_tau_nl_size,psp->ln_pk_4_b2b2,psp->ln_k_size,psp->ddln_pk_4_b2b2,_SPLINE_EST_DERIV_,psp->error_message),psp->error_message,psp->error_message);
+        
+        class_alloc(psp->ddln_pk_4_b2bG2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,psp->ln_tau_nl_size,psp->ln_pk_4_b2bG2,psp->ln_k_size,psp->ddln_pk_4_b2bG2,_SPLINE_EST_DERIV_,psp->error_message),psp->error_message,psp->error_message);
+        
+        class_alloc(psp->ddln_pk_4_bG2bG2,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+        class_call(array_spline_table_lines(psp->ln_tau_nl,psp->ln_tau_nl_size,psp->ln_pk_4_bG2bG2,psp->ln_k_size,psp->ddln_pk_4_bG2bG2,_SPLINE_EST_DERIV_,psp->error_message),psp->error_message,psp->error_message);
+
+    }
+  }
+    
+    if (pnlpt->method == nlpt_none && pnl->method != nl_none) {
+        if (psp->ln_tau_nl_size > 1) {
+            
+            class_alloc(psp->ddln_pk_nl,sizeof(double)*psp->ln_tau_nl_size*psp->ln_k_size,psp->error_message);
+            
+            class_call(array_spline_table_lines(psp->ln_tau_nl,
+                                                psp->ln_tau_nl_size,
+                                                psp->ln_pk_nl,
+                                                psp->ln_k_size,
+                                                psp->ddln_pk_nl,
+                                                _SPLINE_EST_DERIV_,
+                                                psp->error_message),
+                       psp->error_message,
+                       psp->error_message);
+
+            
+        }
+    }
+
+    
+    
+  free (primordial_pk);
+
+  return _SUCCESS_;
+}
+
+/**
+ * This routine computes a table of values for all matter power spectra P(k),
+ * given the source functions and primordial spectra.
+ *
+ * @param pba Input: pointer to background structure (will provide density of each species)
+ * @param ppt Input: pointer to perturbation structure (contain source functions)
+ * @param psp Input/Output: pointer to spectra structure
+ * @return the error status
+ */
+
+int spectra_matter_transfers(
+                             struct background * pba,
+                             struct perturbs * ppt,
+                             struct spectra * psp
+                             ) {
+
+  /** Summary: */
+
+  /** - define local variables */
+
+  int index_md;
+  int index_ic;
+  int index_k;
+  int index_tau;
+  int last_index_back;
+  double * pvecback_sp_long; /* array with argument pvecback_sp_long[pba->index_bg] */
+  double delta_i,theta_i,rho_i;
+  double delta_rho_tot,rho_tot;
+  double rho_plus_p_theta_tot,rho_plus_p_tot;
+  int n_ncdm;
+  double w_fld,dw_over_da_fld,integral_fld;
+
+  /** - check the presence of scalar modes */
+
+  class_test((ppt->has_scalars == _FALSE_),
+             psp->error_message,
+             "you cannot ask for matter power spectrum since you turned off scalar modes");
+
+  index_md = psp->index_md_scalars;
+
+  /** - allocate and fill array of \f$ T_i(k,\tau)\f$ values */
+
+  class_alloc(psp->matter_transfer,sizeof(double)*psp->ln_tau_size*psp->ln_k_size*psp->ic_size[index_md]*psp->tr_size,psp->error_message);
+
+  /** - allocate temporary vectors where the background quantities will be stored */
+
+  class_alloc(pvecback_sp_long,pba->bg_size*sizeof(double),psp->error_message);
+
+  for (index_tau=0 ; index_tau < psp->ln_tau_size; index_tau++) {
+
+    class_call(background_at_tau(pba,
+                                 ppt->tau_sampling[index_tau-psp->ln_tau_size+ppt->tau_size],
+                                 /* for this last argument we could have passed
+                                    exp(psp->ln_tau[index_tau]) but we would then loose
+                                    precision in the exp(log(x)) operation) */
+                                 pba->long_info,
+                                 pba->inter_normal,
+                                 &last_index_back,
+                                 pvecback_sp_long),
+               pba->error_message,
+               psp->error_message);
+
+    for (index_k=0; index_k<psp->ln_k_size; index_k++) {
+
+      for (index_ic = 0; index_ic < psp->ic_size[index_md]; index_ic++) {
+
+        delta_rho_tot=0.;
+        rho_tot=0.;
+        rho_plus_p_theta_tot=0.;
+        rho_plus_p_tot=0.;
+
+        /* T_g(k,tau) */
+
+        rho_i = pvecback_sp_long[pba->index_bg_rho_g];
+
+        if (ppt->has_source_delta_g == _TRUE_) {
+
+          delta_i = ppt->sources[index_md]
+            [index_ic * ppt->tp_size[index_md] + ppt->index_tp_delta_g]
+            [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+          psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_delta_g] = delta_i;
+
+          delta_rho_tot += rho_i * delta_i;
+
+          rho_tot += rho_i;
+
+        }
+
+        if (ppt->has_source_theta_g == _TRUE_) {
+
+          theta_i = ppt->sources[index_md]
+            [index_ic * ppt->tp_size[index_md] + ppt->index_tp_theta_g]
+            [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+          psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_theta_g] = theta_i;
+
+          rho_plus_p_theta_tot += 4./3. * rho_i * theta_i;
+
+          rho_plus_p_tot += 4./3. * rho_i;
+
+        }
+
+        /* T_b(k,tau) */
+
+        rho_i = pvecback_sp_long[pba->index_bg_rho_b];
+
+        if (ppt->has_source_delta_b == _TRUE_) {
+
+          delta_i = ppt->sources[index_md]
+            [index_ic * ppt->tp_size[index_md] + ppt->index_tp_delta_b]
+            [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+          psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_delta_b] = delta_i;
+
+          delta_rho_tot += rho_i * delta_i;
+
+        }
+
+        rho_tot += rho_i;
+
+        if (ppt->has_source_theta_b == _TRUE_) {
+
+          theta_i = ppt->sources[index_md]
+            [index_ic * ppt->tp_size[index_md] + ppt->index_tp_theta_b]
+            [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+          psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_theta_b] = theta_i;
+
+          rho_plus_p_theta_tot += rho_i * theta_i;
+
+        }
+
+        rho_plus_p_tot += rho_i;
+
+        /* T_cdm(k,tau) */
+
+        if (pba->has_cdm == _TRUE_) {
+
+          rho_i = pvecback_sp_long[pba->index_bg_rho_cdm];
+
+          if (ppt->has_source_delta_cdm == _TRUE_) {
+
+            delta_i = ppt->sources[index_md]
+              [index_ic * ppt->tp_size[index_md] + ppt->index_tp_delta_cdm]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_delta_cdm] = delta_i;
+
+            delta_rho_tot += rho_i * delta_i;
+
+          }
+
+          rho_tot += rho_i;
+
+          if (ppt->has_source_theta_cdm == _TRUE_) {
+
+            theta_i = ppt->sources[index_md]
+              [index_ic * ppt->tp_size[index_md] + ppt->index_tp_theta_cdm]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_theta_cdm] = theta_i;
+
+            rho_plus_p_theta_tot += rho_i * theta_i;
+
+          }
+
+          rho_plus_p_tot += rho_i;
+
+        }
+
+        /* T_dcdm(k,tau) */
+
+        if (pba->has_dcdm == _TRUE_) {
+
+          rho_i = pvecback_sp_long[pba->index_bg_rho_dcdm];
+
+          if (ppt->has_source_delta_dcdm == _TRUE_) {
+
+            delta_i = ppt->sources[index_md]
+              [index_ic * ppt->tp_size[index_md] + ppt->index_tp_delta_dcdm]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_delta_dcdm] = delta_i;
+
+            delta_rho_tot += rho_i * delta_i;
+
+          }
+
+          rho_tot += rho_i;
+
+          if (ppt->has_source_theta_dcdm == _TRUE_) {
+
+            theta_i = ppt->sources[index_md]
+              [index_ic * ppt->tp_size[index_md] + ppt->index_tp_theta_dcdm]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_theta_dcdm] = theta_i;
+
+            rho_plus_p_theta_tot += rho_i * theta_i;
+
+          }
+
+          rho_plus_p_tot += rho_i;
+
+        }
+
+        /* T_scf(k,tau) */
+
+        if (pba->has_scf == _TRUE_) {
+
+          rho_i = pvecback_sp_long[pba->index_bg_rho_scf];
+
+          if (ppt->has_source_delta_scf == _TRUE_) {
+
+            delta_i = ppt->sources[index_md]
+              [index_ic * ppt->tp_size[index_md] + ppt->index_tp_delta_scf]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_delta_scf] = delta_i;
+
+            delta_rho_tot += rho_i * delta_i;
+
+          }
+
+          rho_tot += rho_i;
+
+          if (ppt->has_source_theta_scf == _TRUE_) {
+
+            theta_i = ppt->sources[index_md]
+              [index_ic * ppt->tp_size[index_md] + ppt->index_tp_theta_scf]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_theta_scf] = theta_i;
+
+            rho_plus_p_theta_tot += (rho_i + pvecback_sp_long[pba->index_bg_p_scf]) * theta_i;
+
+          }
+
+          rho_plus_p_tot += (rho_i + pvecback_sp_long[pba->index_bg_p_scf]);
+
+        }
+
+
+        /* T_fld(k,tau) */
+
+        if (pba->has_fld == _TRUE_) {
+
+          rho_i = pvecback_sp_long[pba->index_bg_rho_fld];
+
+          class_call(background_w_fld(pba,0.,&w_fld,&dw_over_da_fld,&integral_fld), pba->error_message, psp->error_message);
+
+          if (ppt->has_source_delta_fld == _TRUE_) {
+
+            delta_i = ppt->sources[index_md]
+              [index_ic * ppt->tp_size[index_md] + ppt->index_tp_delta_fld]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_delta_fld] = delta_i;
+
+            delta_rho_tot += rho_i * delta_i;
+
+          }
+
+          rho_tot += rho_i;
+
+          if (ppt->has_source_theta_fld == _TRUE_) {
+
+            theta_i = ppt->sources[index_md]
+              [index_ic * ppt->tp_size[index_md] + ppt->index_tp_theta_fld]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_theta_fld] = theta_i;
+
+            rho_plus_p_theta_tot += (1. + w_fld) * rho_i * theta_i;
+
+          }
+
+          rho_plus_p_tot += (1. + w_fld) * rho_i;
+
+        }
+
+        /* T_ur(k,tau) */
+
+        if (pba->has_ur == _TRUE_) {
+
+          rho_i = pvecback_sp_long[pba->index_bg_rho_ur];
+
+          if (ppt->has_source_delta_ur == _TRUE_) {
+
+            delta_i = ppt->sources[index_md]
+              [index_ic * ppt->tp_size[index_md] + ppt->index_tp_delta_ur]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_delta_ur] = delta_i;
+
+            delta_rho_tot += rho_i * delta_i;
+
+          }
+
+          rho_tot += rho_i;
+
+          if (ppt->has_source_theta_ur == _TRUE_) {
+
+            theta_i = ppt->sources[index_md]
+              [index_ic * ppt->tp_size[index_md] + ppt->index_tp_theta_ur]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_theta_ur] = theta_i;
+
+            rho_plus_p_theta_tot += 4./3. * rho_i * theta_i;
+
+          }
+
+          rho_plus_p_tot += 4./3. * rho_i;
+
+        }
+
+        /* T_dr(k,tau) */
+
+        if (pba->has_dr == _TRUE_) {
+
+          rho_i = pvecback_sp_long[pba->index_bg_rho_dr];
+
+          if (ppt->has_source_delta_dr == _TRUE_) {
+
+            delta_i = ppt->sources[index_md]
+              [index_ic * ppt->tp_size[index_md] + ppt->index_tp_delta_dr]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_delta_dr] = delta_i;
+
+            delta_rho_tot += rho_i * delta_i;
+
+          }
+
+          rho_tot += rho_i;
+
+          if (ppt->has_source_theta_dr == _TRUE_) {
+
+            theta_i = ppt->sources[index_md]
+              [index_ic * ppt->tp_size[index_md] + ppt->index_tp_theta_dr]
+              [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+            psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_theta_dr] = theta_i;
+
+            rho_plus_p_theta_tot += 4./3. * rho_i * theta_i;
+
+          }
+
+          rho_plus_p_tot += 4./3. * rho_i;
+
+        }
+
+        /* T_ncdm_i(k,tau) */
+
+        if (pba->has_ncdm == _TRUE_) {
+
+          for (n_ncdm=0; n_ncdm < pba->N_ncdm; n_ncdm++) {
+
+            rho_i = pvecback_sp_long[pba->index_bg_rho_ncdm1+n_ncdm];
+
+            if (ppt->has_source_delta_ncdm == _TRUE_) {
+
+              delta_i = ppt->sources[index_md]
+                [index_ic * ppt->tp_size[index_md] + ppt->index_tp_delta_ncdm1+n_ncdm]
+                [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+              psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_delta_ncdm1+n_ncdm] = delta_i;
+
+              delta_rho_tot += rho_i * delta_i;
+
+            }
+
+            rho_tot += rho_i;
+
+            if (ppt->has_source_theta_ncdm == _TRUE_) {
+
+              theta_i = ppt->sources[index_md]
+                [index_ic * ppt->tp_size[index_md] + ppt->index_tp_theta_ncdm1+n_ncdm]
+                [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+              psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_theta_ncdm1+n_ncdm] = theta_i;
+
+              rho_plus_p_theta_tot += (rho_i + pvecback_sp_long[pba->index_bg_p_ncdm1+n_ncdm]) * theta_i;
+
+            }
+
+            rho_plus_p_tot += (rho_i + pvecback_sp_long[pba->index_bg_p_ncdm1+n_ncdm]);
+
+          }
+
+        }
+
+        if (ppt->has_source_phi == _TRUE_) {
+
+          psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_phi] = ppt->sources[index_md]
+            [index_ic * ppt->tp_size[index_md] + ppt->index_tp_phi]
+            [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+        }
+
+        if (ppt->has_source_psi == _TRUE_) {
+
+          psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_psi] = ppt->sources[index_md]
+            [index_ic * ppt->tp_size[index_md] + ppt->index_tp_psi]
+            [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+        }
+
+        if (ppt->has_source_phi_prime == _TRUE_) {
+
+          psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_phi_prime] = ppt->sources[index_md]
+            [index_ic * ppt->tp_size[index_md] + ppt->index_tp_phi_prime]
+            [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+        }
+
+        if (ppt->has_source_h == _TRUE_) {
+
+          psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_h] = ppt->sources[index_md]
+            [index_ic * ppt->tp_size[index_md] + ppt->index_tp_h]
+            [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+        }
+
+        if (ppt->has_source_h_prime == _TRUE_) {
+
+          psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_h_prime] = ppt->sources[index_md]
+            [index_ic * ppt->tp_size[index_md] + ppt->index_tp_h_prime]
+            [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+        }
+
+        if (ppt->has_source_eta == _TRUE_) {
+
+          psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_eta] = ppt->sources[index_md]
+            [index_ic * ppt->tp_size[index_md] + ppt->index_tp_eta]
+            [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+        }
+
+        if (ppt->has_source_eta_prime == _TRUE_) {
+
+          psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_eta_prime] = ppt->sources[index_md]
+            [index_ic * ppt->tp_size[index_md] + ppt->index_tp_eta_prime]
+            [(index_tau-psp->ln_tau_size+ppt->tau_size) * ppt->k_size[index_md] + index_k];
+
+        }
+
+        /* could include homogeneous component in rho_tot if uncommented (leave commented to match CMBFAST/CAMB definition) */
+
+        /*  if (pba->has_lambda == _TRUE_) { */
+
+        /*    rho_i = pvecback_sp_long[pba->index_bg_rho_lambda]; */
+
+        /*    rho_tot += rho_i; */
+        /*  } */
+
+        /* T_tot(k,tau) */
+
+        if (ppt->has_density_transfers == _TRUE_) {
+
+          psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_delta_tot] = delta_rho_tot/rho_tot;
+
+        }
+
+        if (ppt->has_velocity_transfers == _TRUE_) {
+
+          psp->matter_transfer[((index_tau*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + psp->index_tr_theta_tot] = rho_plus_p_theta_tot/rho_plus_p_tot;
+
+        }
+
+      }
+    }
+  }
+
+  /**- if interpolation of \f$ P(k,\tau)\f$ will be needed (as a function of tau),
+     compute array of second derivatives in view of spline interpolation */
+
+  if (psp->ln_tau_size > 1) {
+
+    class_alloc(psp->ddmatter_transfer,sizeof(double)*psp->ln_tau_size*psp->ln_k_size*psp->ic_size[index_md]*psp->tr_size,psp->error_message);
+
+    class_call(array_spline_table_lines(psp->ln_tau,
+                                        psp->ln_tau_size,
+                                        psp->matter_transfer,
+                                        psp->ic_size[index_md]*psp->ln_k_size*psp->tr_size,
+                                        psp->ddmatter_transfer,
+                                        _SPLINE_EST_DERIV_,
+                                        psp->error_message),
+               psp->error_message,
+               psp->error_message);
+
+  }
+
+  free (pvecback_sp_long);
+
+  return _SUCCESS_;
+}
+
+int spectra_output_tk_titles(struct background *pba,
+                             struct perturbs *ppt,
+                             enum file_format output_format,
+                             char titles[_MAXTITLESTRINGLENGTH_]
+                             ){
+  int n_ncdm;
+  char tmp[40];
+
+  if (output_format == class_format) {
+    class_store_columntitle(titles,"k (h/Mpc)",_TRUE_);
+    if (ppt->has_density_transfers == _TRUE_) {
+      class_store_columntitle(titles,"d_g",_TRUE_);
+      class_store_columntitle(titles,"d_b",_TRUE_);
+      class_store_columntitle(titles,"d_cdm",pba->has_cdm);
+      class_store_columntitle(titles,"d_fld",pba->has_fld);
+      class_store_columntitle(titles,"d_ur",pba->has_ur);
+      if (pba->has_ncdm == _TRUE_) {
+        for (n_ncdm=0; n_ncdm < pba->N_ncdm; n_ncdm++) {
+          sprintf(tmp,"d_ncdm[%d]",n_ncdm);
+          class_store_columntitle(titles,tmp,_TRUE_);
+        }
+      }
+      class_store_columntitle(titles,"d_dcdm",pba->has_dcdm);
+      class_store_columntitle(titles,"d_dr",pba->has_dr);
+      class_store_columntitle(titles,"d_scf",pba->has_scf);
+      class_store_columntitle(titles,"d_tot",_TRUE_);
+      class_store_columntitle(titles,"phi",ppt->has_source_phi);
+      class_store_columntitle(titles,"psi",ppt->has_source_psi);
+      class_store_columntitle(titles,"phi_prime",ppt->has_source_phi_prime);
+      class_store_columntitle(titles,"h",ppt->has_source_h);
+      class_store_columntitle(titles,"h_prime",ppt->has_source_h_prime);
+      class_store_columntitle(titles,"eta",ppt->has_source_eta);
+      class_store_columntitle(titles,"eta_prime",ppt->has_source_eta_prime);
+    }
+    if (ppt->has_velocity_transfers == _TRUE_) {
+      class_store_columntitle(titles,"t_g",_TRUE_);
+      class_store_columntitle(titles,"t_b",_TRUE_);
+      class_store_columntitle(titles,"t_cdm",((pba->has_cdm == _TRUE_) && (ppt->gauge != synchronous)));
+      class_store_columntitle(titles,"t_fld",pba->has_fld);
+      class_store_columntitle(titles,"t_ur",pba->has_ur);
+      if (pba->has_ncdm == _TRUE_) {
+        for (n_ncdm=0; n_ncdm < pba->N_ncdm; n_ncdm++) {
+          sprintf(tmp,"t_ncdm[%d]",n_ncdm);
+          class_store_columntitle(titles,tmp,_TRUE_);
+        }
+      }
+      class_store_columntitle(titles,"t_dcdm",pba->has_dcdm);
+      class_store_columntitle(titles,"t_dr",pba->has_dr);
+      class_store_columntitle(titles,"t__scf",pba->has_scf);
+      class_store_columntitle(titles,"t_tot",_TRUE_);
+    }
+  }
+
+  else if (output_format == camb_format) {
+
+    class_store_columntitle(titles,"k (h/Mpc)",_TRUE_);
+    class_store_columntitle(titles,"-T_cdm/k2",_TRUE_);
+    class_store_columntitle(titles,"-T_b/k2",_TRUE_);
+    class_store_columntitle(titles,"-T_g/k2",_TRUE_);
+    class_store_columntitle(titles,"-T_ur/k2",_TRUE_);
+    class_store_columntitle(titles,"-T_ncdm/k2",_TRUE_);
+    class_store_columntitle(titles,"-T_tot/k2",_TRUE_);
+
+  }
+
+  return _SUCCESS_;
+
+}
+
+int spectra_output_tk_data(
+                          struct background * pba,
+                          struct perturbs * ppt,
+                          struct spectra * psp,
+                          enum file_format output_format,
+                          double z,
+                          int number_of_titles,
+                          double *data
+                          ) {
+
+  int n_ncdm;
+  double k, k_over_h, k2;
+  double * tkfull=NULL;  /* array with argument
+                   pk_ic[(index_k * psp->ic_size[index_md] + index_ic)*psp->tr_size+index_tr] */
+  double *tk;
+  double *dataptr;
+
+  int index_md=0;
+  int index_ic;
+  int index_k;
+  int index_tr;
+  int storeidx;
+
+  if (psp->ln_k_size*psp->ic_size[index_md]*psp->tr_size > 0){
+  class_alloc(tkfull,
+              psp->ln_k_size*psp->ic_size[index_md]*psp->tr_size*sizeof(double),
+              psp->error_message);
+  }
+
+    /** - compute \f$T_i(k)\f$ for each k (if several ic's, compute it for each ic; if z_pk = 0, this is done by directly reading inside the pre-computed table; if not, this is done by interpolating the table at the correct value of tau. */
+
+    /* if z_pk = 0, no interpolation needed */
+
+    if (z == 0.) {
+
+      for (index_k=0; index_k<psp->ln_k_size; index_k++) {
+        for (index_tr=0; index_tr<psp->tr_size; index_tr++) {
+          for (index_ic=0; index_ic<psp->ic_size[index_md]; index_ic++) {
+            tkfull[(index_k * psp->ic_size[index_md] + index_ic) * psp->tr_size + index_tr] = psp->matter_transfer[(((psp->ln_tau_size-1)*psp->ln_k_size + index_k) * psp->ic_size[index_md] + index_ic) * psp->tr_size + index_tr];
+          }
+        }
+      }
+    }
+
+    /* if 0 <= z_pk <= z_max_pk, interpolation needed, */
+    else {
+
+      class_call(spectra_tk_at_z(pba,
+                                 psp,
+                                 z,
+                                 tkfull),
+                 psp->error_message,
+                 psp->error_message);
+    }
+
+    /** - store data */
+
+    for (index_ic = 0; index_ic < psp->ic_size[index_md]; index_ic++) {
+
+      for (index_k=0; index_k<psp->ln_k_size; index_k++) {
+
+        storeidx = 0;
+        dataptr = data+index_ic*(psp->ln_k_size*number_of_titles)+index_k*number_of_titles;
+        tk = &(tkfull[(index_k * psp->ic_size[index_md] + index_ic) * psp->tr_size]);
+        k = exp(psp->ln_k[index_k]);
+        k2 = k*k;
+        k_over_h = k/pba->h;
+
+        class_store_double(dataptr, k_over_h, _TRUE_,storeidx);
+
+        /* indices for species associated with a velocity transfer function in Fourier space */
+
+        if (output_format == class_format) {
+
+          if (ppt->has_density_transfers == _TRUE_) {
+
+            class_store_double(dataptr,tk[psp->index_tr_delta_g],ppt->has_source_delta_g,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_delta_b],ppt->has_source_delta_b,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_delta_cdm],ppt->has_source_delta_cdm,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_delta_fld],ppt->has_source_delta_fld,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_delta_ur],ppt->has_source_delta_ur,storeidx);
+            if (pba->has_ncdm == _TRUE_){
+              for (n_ncdm = 0; n_ncdm < pba->N_ncdm; n_ncdm++){
+                class_store_double(dataptr,tk[psp->index_tr_delta_ncdm1+n_ncdm],ppt->has_source_delta_ncdm,storeidx);
+              }
+            }
+            class_store_double(dataptr,tk[psp->index_tr_delta_dcdm],ppt->has_source_delta_dcdm,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_delta_dr],ppt->has_source_delta_dr,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_delta_scf],ppt->has_source_delta_scf,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_delta_tot],_TRUE_,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_phi],ppt->has_source_phi,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_psi],ppt->has_source_psi,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_phi_prime],ppt->has_source_phi_prime,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_h],ppt->has_source_h,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_h_prime],ppt->has_source_h_prime,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_eta],ppt->has_source_eta,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_eta_prime],ppt->has_source_eta_prime,storeidx);
+          }
+          if (ppt->has_velocity_transfers == _TRUE_) {
+
+            class_store_double(dataptr,tk[psp->index_tr_theta_g],ppt->has_source_theta_g,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_theta_b],ppt->has_source_theta_b,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_theta_cdm],ppt->has_source_theta_cdm,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_theta_fld],ppt->has_source_theta_fld,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_theta_ur],ppt->has_source_theta_ur,storeidx);
+            if (pba->has_ncdm == _TRUE_){
+              for (n_ncdm = 0; n_ncdm < pba->N_ncdm; n_ncdm++){
+                class_store_double(dataptr,tk[psp->index_tr_theta_ncdm1+n_ncdm],ppt->has_source_theta_ncdm,storeidx);
+              }
+            }
+            class_store_double(dataptr,tk[psp->index_tr_theta_dcdm],ppt->has_source_theta_dcdm,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_theta_dr],ppt->has_source_theta_dr,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_theta_scf],ppt->has_source_theta_scf,storeidx);
+            class_store_double(dataptr,tk[psp->index_tr_theta_tot],_TRUE_,storeidx);
+
+          }
+
+        }
+        else if (output_format == camb_format) {
+
+          /* rescale and reorder the matter transfer functions following the CMBFAST/CAMB convention */
+          class_store_double_or_default(dataptr,-tk[psp->index_tr_delta_cdm]/k2,ppt->has_source_delta_cdm,storeidx,0.0);
+          class_store_double_or_default(dataptr,-tk[psp->index_tr_delta_b]/k2,ppt->has_source_delta_b,storeidx,0.0);
+          class_store_double_or_default(dataptr,-tk[psp->index_tr_delta_g]/k2,ppt->has_source_delta_g,storeidx,0.0);
+          class_store_double_or_default(dataptr,-tk[psp->index_tr_delta_ur]/k2,ppt->has_source_delta_ur,storeidx,0.0);
+          class_store_double_or_default(dataptr,-tk[psp->index_tr_delta_ncdm1]/k2,ppt->has_source_delta_ncdm,storeidx,0.0);
+          class_store_double_or_default(dataptr,-tk[psp->index_tr_delta_tot]/k2,_TRUE_,storeidx,0.0);
+        }
+      }
+    }
+
+    //Necessary because the size could be zero (if psp->tr_size is zero)
+    if (tkfull != NULL)
+      free(tkfull);
+
+    return _SUCCESS_;
+}
+
+ int spectra_firstline_and_ic_suffix(struct perturbs *ppt,
+                                    int index_ic,
+                                    char first_line[_LINE_LENGTH_MAX_],
+                                    FileName ic_suffix){
+
+  first_line[0]='\0';
+  ic_suffix[0]='\0';
+
+
+  if ((ppt->has_ad == _TRUE_) && (index_ic == ppt->index_ic_ad)) {
+    strcpy(ic_suffix,"ad");
+    strcpy(first_line,"for adiabatic (AD) mode (normalized to initial curvature=1) ");
+  }
+
+  if ((ppt->has_bi == _TRUE_) && (index_ic == ppt->index_ic_bi)) {
+    strcpy(ic_suffix,"bi");
+    strcpy(first_line,"for baryon isocurvature (BI) mode (normalized to initial entropy=1)");
+  }
+
+  if ((ppt->has_cdi == _TRUE_) && (index_ic == ppt->index_ic_cdi)) {
+    strcpy(ic_suffix,"cdi");
+    strcpy(first_line,"for CDM isocurvature (CDI) mode (normalized to initial entropy=1)");
+  }
+
+  if ((ppt->has_nid == _TRUE_) && (index_ic == ppt->index_ic_nid)) {
+    strcpy(ic_suffix,"nid");
+    strcpy(first_line,"for neutrino density isocurvature (NID) mode (normalized to initial entropy=1)");
+  }
+
+  if ((ppt->has_niv == _TRUE_) && (index_ic == ppt->index_ic_niv)) {
+    strcpy(ic_suffix,"niv");
+    strcpy(first_line,"for neutrino velocity isocurvature (NIV) mode (normalized to initial entropy=1)");
+  }
+  return _SUCCESS_;
+}
+
+
+

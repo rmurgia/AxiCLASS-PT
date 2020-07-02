@@ -54,22 +54,22 @@ int main(int argc, char **argv) {
         return _FAILURE_;
   }
 
-  if (transfer_init(&pr,&ba,&th,&pt,&nl,&tr) == _FAILURE_) {
+  if (transfer_init(&pr,&ba,&th,&pt,&nl,&nlpt,&tr) == _FAILURE_) {
     printf("\n\nError in transfer_init \n=>%s\n",tr.error_message);
     return _FAILURE_;
   }
 
-  if (spectra_init(&pr,&ba,&pt,&pm,&nl,&tr,&sp) == _FAILURE_) {
+  if (spectra_init(&pr,&ba,&pt,&pm,&nlpt,&nl,&tr,&sp) == _FAILURE_) {
     printf("\n\nError in spectra_init \n=>%s\n",sp.error_message);
     return _FAILURE_;
   }
 
-  if (lensing_init(&pr,&pt,&sp,&nl,&le) == _FAILURE_) {
+  if (lensing_init(&pr,&pt,&sp,&nlpt,&nl,&le) == _FAILURE_) {
     printf("\n\nError in lensing_init \n=>%s\n",le.error_message);
     return _FAILURE_;
   }
 
-  if (output_init(&ba,&th,&pt,&pm,&tr,&sp,&nl,&le,&op) == _FAILURE_) {
+  if (output_init(&ba,&th,&pt,&pm,&tr,&sp,&nlpt,&nl,&le,&op) == _FAILURE_) {
     printf("\n\nError in output_init \n=>%s\n",op.error_message);
     return _FAILURE_;
   }

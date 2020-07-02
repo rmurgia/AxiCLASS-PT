@@ -3123,6 +3123,72 @@ int array_trapezoidal_integral(
  * @return the error status
  */
 
+/**
+  * Get the y[i] for which y[i]>c
+  *
+  * Called by nonlinear_HMcode()
+  */
+int array_search_bisect(
+                        int n_lines,
+                        double * __restrict__ array,
+                        double c,
+                        int * __restrict__ last_index,
+                        ErrorMsg errmsg) {
+
+  int inf,sup,mid;
+
+  inf=0;
+  sup=n_lines-1;
+
+  if (array[inf] < array[sup]){
+
+    if (c < array[inf]) {
+      sprintf(errmsg,"%s(L:%d) : c=%e < y_min=%e",__func__,__LINE__,c,array[inf]);
+      return _FAILURE_;
+    }
+
+    if (c > array[sup]) {
+      sprintf(errmsg,"%s(L:%d) : c=%e > y_max=%e",__func__,__LINE__,c,array[sup]);
+      return _FAILURE_;
+    }
+
+    while (sup-inf > 1) {
+
+      mid=(int)(0.5*(inf+sup));
+      if (c < array[mid]) {sup=mid;}
+      else {inf=mid;}
+
+    }
+
+  }
+
+  else {
+
+    if (c < array[sup]) {
+      sprintf(errmsg,"%s(L:%d) : x=%e < x_min=%e",__func__,__LINE__,c,array[sup]);
+      return _FAILURE_;
+    }
+
+    if (c > array[inf]) {
+      sprintf(errmsg,"%s(L:%d) : x=%e > x_max=%e",__func__,__LINE__,c,array[inf]);
+      return _FAILURE_;
+    }
+
+    while (sup-inf > 1) {
+
+      mid=(int)(0.5*(inf+sup));
+      if (c > array[mid]) {sup=mid;}
+      else {inf=mid;}
+
+    }
+
+  }
+
+  *last_index = inf;
+
+  return _SUCCESS_;
+}
+
 int array_trapezoidal_convolution(
                                      double * __restrict__ integrand1,
                                      double * __restrict__ integrand2,

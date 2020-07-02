@@ -197,6 +197,8 @@ struct transfers {
 
   short transfer_verbose; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 
+  struct nonlinear_pt * pnlpt;
+
   ErrorMsg error_message; /**< zone for writing error messages */
 
   //@}
@@ -311,6 +313,7 @@ extern "C" {
                     struct thermo * pth,
                     struct perturbs * ppt,
                     struct nonlinear * pnl,
+                    struct nonlinear_pt * pnlpt,
                     struct transfers * ptr
                     );
 
@@ -330,6 +333,7 @@ extern "C" {
   int transfer_perturbation_copy_sources_and_nl_corrections(
                                                             struct perturbs * ppt,
                                                             struct nonlinear * pnl,
+                                                            struct nonlinear_pt * pnlpt,
                                                             struct transfers * ptr,
                                                             double *** sources
                                                             );
@@ -344,6 +348,7 @@ extern "C" {
   int transfer_perturbation_sources_free(
                                          struct perturbs * ppt,
                                          struct nonlinear * pnl,
+                                         struct nonlinear_pt * pnlpt,
                                          struct transfers * ptr,
                                          double *** sources
                                          );

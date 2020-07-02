@@ -4443,24 +4443,10 @@ int input_default_params(
   psp->non_diag=0;
   psp->A_lens = 1;
   ple->A_lens_TTTEEE = 1;
-  /** - nonlinear structure */
 
   /** - lensing structure */
 
   ple->has_lensed_cls = _FALSE_;
-
-  /** - nonlinear structure */
-
-  pnl->method = nl_none;
-  pnlpt->method = nlpt_none;
-
-  pnlpt->z_pk_num = 1;
-  pnlpt->z_pk[0] = 0.;
-  pnlpt->OmfidAP = 0.31;
-
-  pnlpt->fast_output = _FALSE_;
-  pnlpt->cb = _TRUE_;
-
   /** - all verbose parameters */
 
   pba->background_verbose = 0;
@@ -5075,7 +5061,7 @@ int input_try_unknown_parameters(double * unknown_parameter,
       printf("Stage 6: transfer\n");
     tr.transfer_verbose = 0;
 
-    class_call_except(transfer_init(&pr,&ba,&th,&pt,&nl,&tr),
+    class_call_except(transfer_init(&pr,&ba,&th,&pt,&nl,&nlpt,&tr),
                       tr.error_message,
                       errmsg,
                       nonlinear_free(&nl);primordial_free(&pm);perturb_free(&pt);thermodynamics_free(&th);background_free(&ba)
@@ -5086,7 +5072,7 @@ int input_try_unknown_parameters(double * unknown_parameter,
     if (input_verbose>2)
       printf("Stage 7: spectra\n");
     sp.spectra_verbose = 0;
-    class_call_except(spectra_init(&pr,&ba,&pt,&pm,&nl,&tr,&sp),
+    class_call_except(spectra_init(&pr,&ba,&pt,&pm,&nlpt,&nl,&tr,&sp),
                       sp.error_message,
                       errmsg,
                       transfer_free(&tr);nonlinear_free(&nl);primordial_free(&pm);perturb_free(&pt);thermodynamics_free(&th);background_free(&ba)
