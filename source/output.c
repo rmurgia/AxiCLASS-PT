@@ -935,7 +935,7 @@ int output_pk_nl(
 
     sprintf(file_name,"%s%s%s",pop->root,redshift_suffix,"pk_nl_halofit.dat");
 
-    class_call(output_open_pk_file(pba,
+    class_call(output_open_pk_file_psp(pba,
                                    psp,
                                    pop,
                                    &out,
@@ -2732,6 +2732,37 @@ int output_one_line_of_cl(
  * @param z          Input: redshift of the output
  * @return the error status
  */
+
+int output_open_pk_file_psp(
+                        struct background * pba,
+                        struct spectra * psp,
+                        struct output * pop,
+                        FILE * * pkfile,
+                        FileName filename,
+                        char * first_line,
+                        double z
+                        ) {
+
+  int colnum = 1;
+  class_open(*pkfile,filename,"w",pop->error_message);
+
+  if (pop->write_header == _TRUE_) {
+    fprintf(*pkfile,"# Matter power spectrum P(k) %sat redshift z=%g\n",first_line,z);
+    fprintf(*pkfile,"# for k=%g to %g h/Mpc,\n",
+            exp(psp->ln_k[0])/pba->h,
+            exp(psp->ln_k[psp->ln_k_size-1])/pba->h);
+    fprintf(*pkfile,"# number of wavenumbers equal to %d\n",psp->ln_k_size);
+
+    fprintf(*pkfile,"#");
+    class_fprintf_columntitle(*pkfile,"k (h/Mpc)",_TRUE_,colnum);
+    class_fprintf_columntitle(*pkfile,"P (Mpc/h)^3",_TRUE_,colnum);
+
+    fprintf(*pkfile,"\n");
+  }
+
+  return _SUCCESS_;
+}
+
 
 int output_open_pk_file(
                         struct background * pba,

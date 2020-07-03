@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
     return _FAILURE_;
   }
 
-  if (spectra_init(&pr,&ba,&pt,&pm,&nlpt,&nl,&tr,&sp) == _FAILURE_) {
+  if (spectra_init(&pr,&ba,&pt,&pm,&nl,&nlpt,&tr,&sp) == _FAILURE_) {
     printf("\n\nError in spectra_init \n=>%s\n",sp.error_message);
     return _FAILURE_;
   }

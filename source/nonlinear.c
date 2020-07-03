@@ -295,9 +295,9 @@ int nonlinear_pks_at_z(
                        enum pk_outputs pk_output,
                        double z,
                        double * out_pk,      // array out_pk[index_k]
-                       double * out_pk_ic   // array out_pk_ic[index_k * pnl->ic_ic_size + index_ic1_ic2]
-                       //double * out_pk_cb,   // array out_pk_cb[index_k]
-                       //double * out_pk_cb_ic // array out_pk_cb_ic[index_k * pnl->ic_ic_size + index_ic1_ic2]
+                       double * out_pk_ic,   // array out_pk_ic[index_k * pnl->ic_ic_size + index_ic1_ic2]
+                       double * out_pk_cb,   // array out_pk_cb[index_k]
+                       double * out_pk_cb_ic // array out_pk_cb_ic[index_k * pnl->ic_ic_size + index_ic1_ic2]
                        ) {
 
   if (pnl->has_pk_cb) {
@@ -308,8 +308,8 @@ int nonlinear_pks_at_z(
                                  pk_output,
                                  z,
                                  pnl->index_pk_cb,
-                                 //out_pk_cb,
-                                 //out_pk_cb_ic
+                                 out_pk_cb,
+                                 out_pk_cb_ic
                                  ),
                pnl->error_message,
                pnl->error_message);
@@ -681,9 +681,9 @@ int nonlinear_pks_at_k_and_z(
                              double k,
                              double z,
                              double * out_pk, // number P_m(k)
-                             double * out_pk_ic // array P_m_ic(k) of index [index_ic1_ic2]
-                             //double * out_pk_cb, // number P_cb(k)
-                             //double * out_pk_cb_ic // array P__cb_ic(k)of index [index_ic1_ic2]
+                             double * out_pk_ic, // array P_m_ic(k) of index [index_ic1_ic2]
+                             double * out_pk_cb, // number P_cb(k)
+                             double * out_pk_cb_ic // array P__cb_ic(k)of index [index_ic1_ic2]
                              ) {
 
   if (pnl->has_pk_cb) {
@@ -694,9 +694,9 @@ int nonlinear_pks_at_k_and_z(
                                        pk_output,
                                        k,
                                        z,
-                                       pnl->index_pk_cb
-                                       //out_pk_cb,
-                                       //out_pk_cb_ic
+                                       pnl->index_pk_cb,
+                                       out_pk_cb,
+                                       out_pk_cb_ic
                                        ),
                pnl->error_message,
                pnl->error_message);
