@@ -398,7 +398,7 @@ struct spectra {
                             deprecated functions are removed, it will
                             be possible to remove also this pointer. */
   
-  //struct nonlinear_pt * pnlpt;
+  struct nonlinear_pt * pnlpt;
 
   //@}
 };
@@ -439,8 +439,8 @@ extern "C" {
                    struct background * pba,
                    struct perturbs * ppt,
                    struct primordial * ppm,
-                   struct nonlinear_pt *pnlpt,
                    struct nonlinear *pnl,
+                   struct nonlinear_pt *pnlpt,
                    struct transfers * ptr,
                    struct spectra * psp
                    );
@@ -485,8 +485,8 @@ extern "C" {
   int spectra_k_and_tau(
                         struct background * pba,
                         struct perturbs * ppt,
-                        struct nonlinear_pt *pnlpt,
                         struct nonlinear *pnl,
+                        struct nonlinear_pt *pnlpt,
                         struct spectra * psp
                         );
 
@@ -494,8 +494,8 @@ extern "C" {
                  struct background * pba,
                  struct perturbs * ppt,
                  struct primordial * ppm,
-                 struct nonlinear_pt *pnlpt,
                  struct nonlinear *pnl,
+                 struct nonlinear_pt *pnlpt,
                  struct spectra * psp
                  );
 
@@ -595,8 +595,8 @@ extern "C" {
                                struct background * pba,
                                struct primordial * ppm,
                                struct spectra * psp,
-                               struct nonlinear_pt * pnlpt,
                                struct nonlinear * pnl,
+                               struct nonlinear_pt * pnlpt,
                                double k,
                                double z,
                                double * pk_tot,

@@ -218,7 +218,7 @@ extern "C" {
     
     int output_open_pk_rsd_2_file(
                                   struct background * pba,
-                                                               struct nonlinear_pt * pnlpt,
+                                  struct nonlinear_pt * pnlpt,
                                   struct spectra * psp,
                                   struct output * pop,
                                   FILE ** pkfile,
@@ -229,7 +229,7 @@ extern "C" {
     
     int output_open_pk_rsd_4_file(
                                   struct background * pba,
-                                                               struct nonlinear_pt * pnlpt,
+                                  struct nonlinear_pt * pnlpt,
                                   struct spectra * psp,
                                   struct output * pop,
                                   FILE ** pkfile,

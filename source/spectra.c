@@ -264,8 +264,8 @@ int spectra_init(
                  struct background * pba,
                  struct perturbs * ppt,
                  struct primordial * ppm,
-                 struct nonlinear_pt *pnlpt,
                  struct nonlinear *pnl,
+                 struct nonlinear_pt *pnlpt,
                  struct transfers * ptr,
                  struct spectra * psp
                  ) {
@@ -315,13 +315,13 @@ int spectra_init(
 
   if ((ppt->has_pk_matter == _TRUE_) || (ppt->has_density_transfers == _TRUE_) || (ppt->has_velocity_transfers == _TRUE_)) {
 
-    class_call(spectra_k_and_tau(pba,ppt,pnlpt,pnl,psp),
+    class_call(spectra_k_and_tau(pba,ppt,pnl,pnlpt,psp),
                psp->error_message,
                psp->error_message);
 
     if (ppt->has_pk_matter == _TRUE_) {
 
-      class_call(spectra_pk(pba,ppt,ppm,pnlpt,pnl,psp),
+      class_call(spectra_pk(pba,ppt,ppm,pnl,pnlpt,psp),
                  psp->error_message,
                  psp->error_message);
 
@@ -4305,8 +4305,8 @@ int spectra_tk_at_k_and_z(
 int spectra_k_and_tau(
                       struct background * pba,
                       struct perturbs * ppt,
-                      struct nonlinear_pt *pnlpt,
                       struct nonlinear *pnl,
+                      struct nonlinear_pt *pnlpt,
                       struct spectra * psp
                       ) {
 

@@ -64,12 +64,12 @@ int main(int argc, char **argv) {
     return _FAILURE_;
   }
 
-  if (lensing_init(&pr,&pt,&sp,&nlpt,&nl,&le) == _FAILURE_) {
+  if (lensing_init(&pr,&pt,&sp,&nl,&nlpt,&le) == _FAILURE_) {
     printf("\n\nError in lensing_init \n=>%s\n",le.error_message);
     return _FAILURE_;
   }
 
-  if (output_init(&ba,&th,&pt,&pm,&tr,&sp,&nlpt,&nl,&le,&op) == _FAILURE_) {
+  if (output_init(&ba,&th,&pt,&pm,&tr,&sp,&nl,&nlpt,&le,&op) == _FAILURE_) {
     printf("\n\nError in output_init \n=>%s\n",op.error_message);
     return _FAILURE_;
   }

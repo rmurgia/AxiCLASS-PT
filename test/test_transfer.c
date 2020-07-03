@@ -16,6 +16,7 @@ int main(int argc, char **argv) {
   struct primordial pm;       /* for primordial spectra */
   struct spectra sp;          /* for output spectra */
   struct nonlinear nl;        /* for non-linear spectra */
+  struct nonlinear nl;        /* for non-linear spectra */
   struct lensing le;          /* for lensed spectra */
   struct output op;           /* for output files */
   ErrorMsg errmsg;            /* for error messages */

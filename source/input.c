@@ -5072,7 +5072,7 @@ int input_try_unknown_parameters(double * unknown_parameter,
     if (input_verbose>2)
       printf("Stage 7: spectra\n");
     sp.spectra_verbose = 0;
-    class_call_except(spectra_init(&pr,&ba,&pt,&pm,&nlpt,&nl,&tr,&sp),
+    class_call_except(spectra_init(&pr,&ba,&pt,&pm,&nl,&nlpt,&tr,&sp),
                       sp.error_message,
                       errmsg,
                       transfer_free(&tr);nonlinear_free(&nl);primordial_free(&pm);perturb_free(&pt);thermodynamics_free(&th);background_free(&ba)

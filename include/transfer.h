@@ -4,6 +4,7 @@
 #define __TRANSFER__
 
 #include "nonlinear.h"
+#include "nonlinear_pt.h"
 #include "hyperspherical.h"
 #include <sys/shm.h>
 #include <sys/stat.h>
@@ -196,8 +197,6 @@ struct transfers {
   short initialise_HIS_cache; /**< only true if we are using CLASS for setting up a cache of HIS structures */
 
   short transfer_verbose; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
-
-  struct nonlinear_pt * pnlpt;
 
   ErrorMsg error_message; /**< zone for writing error messages */
 
