@@ -671,17 +671,29 @@ int transfer_perturbation_copy_sources_and_nl_corrections(
           class_alloc(sources[index_md][index_ic * ppt->tp_size[index_md] + index_tp],
                       ppt->k_size[index_md]*ppt->tau_size*sizeof(double),
                       ptr->error_message);
-                if (pnl->method != nl_none){
-
+          if (pnl->method != nl_none){
+          
           for (index_tau=0; index_tau<ppt->tau_size; index_tau++) {
-            for (index_k=0; index_k<ppt->k_size[index_md]; index_k++) { 
-              sources[index_md]
-                [index_ic * ppt->tp_size[index_md] + index_tp]
-                [index_tau * ppt->k_size[index_md] + index_k] =
-                ppt->sources[index_md]
-                [index_ic * ppt->tp_size[index_md] + index_tp]
-                [index_tau * ppt->k_size[index_md] + index_k]
-                * pnl->nl_corr_density[index_tau * ppt->k_size[index_md] + index_k];
+            for (index_k=0; index_k<ppt->k_size[index_md]; index_k++) {
+              if (((ppt->has_source_delta_cb == _TRUE_) && (index_tp == ppt->index_tp_delta_cb)) ||
+                  ((ppt->has_source_theta_cb == _TRUE_) && (index_tp == ppt->index_tp_theta_cb))){
+                sources[index_md]
+                  [index_ic * ppt->tp_size[index_md] + index_tp]
+                  [index_tau * ppt->k_size[index_md] + index_k] =
+                  ppt->sources[index_md]
+                  [index_ic * ppt->tp_size[index_md] + index_tp]
+                  [index_tau * ppt->k_size[index_md] + index_k]
+                  * pnl->nl_corr_density[pnl->index_pk_cb][index_tau * ppt->k_size[index_md] + index_k];
+              }
+              else{
+                sources[index_md]
+                  [index_ic * ppt->tp_size[index_md] + index_tp]
+                  [index_tau * ppt->k_size[index_md] + index_k] =
+                  ppt->sources[index_md]
+                  [index_ic * ppt->tp_size[index_md] + index_tp]
+                  [index_tau * ppt->k_size[index_md] + index_k]
+                  * pnl->nl_corr_density[pnl->index_pk_m][index_tau * ppt->k_size[index_md] + index_k];
+              }
             }
           }
                 }

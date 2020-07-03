@@ -531,8 +531,8 @@ extern "C" {
                          struct spectra * psp,
                          enum linear_or_logarithmic mode,
                          double z,
-                         double * output_tot,
-                         double * output_cb_tot
+                         double * output_tot
+                         //double * output_cb_tot
                          );
 
   int spectra_pk_nl_bias_at_z_i(
