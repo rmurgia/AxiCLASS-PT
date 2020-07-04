@@ -6,7 +6,7 @@ EFTofLSS non-linear predictions in EDE models
 
 FEATURES:
 
-1) Introduction of the nonlinear_pt module in AxiCLASS
+1) Introduction of the nonlinear_pt module from CLASS-PT in AxiCLASS
 2) Significant changes to the nonlinear module, to accomodate both the functions used by AxiCLASS (based on class 2.9, with HMcode) and the ones used by CLASS-PT (based on class 2.6, without HMcode)
 3) Significant changes to the input, transfer, spectra, and output modules
 4) Minor changes to the main, class, common, arrays, perturbations, and lensing modules
