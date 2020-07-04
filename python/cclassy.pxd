@@ -371,9 +371,7 @@ cdef extern from "class.h":
         int mode,
         double z,
         double * output_tot,
-        double * output_ic,
-        double * output_cb_tot,
-        double * output_cb_ic
+        double * output_ic
         )
 
     int spectra_pk_at_k_and_z(
@@ -383,20 +381,17 @@ cdef extern from "class.h":
         double k,
         double z,
         double * pk,
-        double * pk_ic,
-        double * pk_cb,
-        double * pk_cb_ic)
+        double * pk_ic)
 
     int spectra_pk_nl_at_k_and_z(
-        void* pba,
+        void * pba,
         void * ppm,
         void * psp,
+        void * pnl,
+        void * pnlpt,
         double k,
         double z,
         double * pk,
-        double * pk_cb,
-        void * pnl,
-        void * pnlpt,
         double * pk_Id2d2,
         double * pk_Id2,
         double * pk_IG2,
@@ -450,8 +445,7 @@ cdef extern from "class.h":
         void * psp,
         int mode,
         double z,
-        double * output_tot,
-        double * output_cb_tot)
+        double * output_tot)
 
     int nonlinear_pk_at_k_and_z(
         void * pba,

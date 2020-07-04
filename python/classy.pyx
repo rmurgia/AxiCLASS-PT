@@ -441,14 +441,14 @@ cdef class Class:
 
         if "transfer" in level:
             if transfer_init(&(self.pr), &(self.ba), &(self.th),
-                             &(self.pt), &(self.nlpt), &(self.nlpt), &(self.tr)) == _FAILURE_:
+                             &(self.pt), &(self.nl), &(self.nlpt), &(self.tr)) == _FAILURE_:
                 self.struct_cleanup()
                 raise CosmoComputationError(self.tr.error_message)
             self.ncp.add("transfer")
 
         if "spectra" in level:
             if spectra_init(&(self.pr), &(self.ba), &(self.pt),
-                            &(self.pm), &(self.nlpt), &(self.nl), &(self.tr),
+                            &(self.pm), &(self.nl), &(self.nlpt), &(self.tr),
                             &(self.sp)) == _FAILURE_:
                 self.struct_cleanup()
                 raise CosmoComputationError(self.sp.error_message)
@@ -456,7 +456,7 @@ cdef class Class:
 
         if "lensing" in level:
             if lensing_init(&(self.pr), &(self.pt), &(self.sp),
-                            &(self.nlpt), &(self.nl), &(self.le)) == _FAILURE_:
+                            &(self.nl), &(self.nlpt), &(self.le)) == _FAILURE_:
                 self.struct_cleanup()
                 raise CosmoComputationError(self.le.error_message)
             self.ncp.add("lensing")
@@ -856,6 +856,7 @@ cdef class Class:
         else:
              if spectra_pk_nl_at_k_and_z(&self.ba,&self.pm,&self.sp,&self.nl,&self.nlpt,k,z,&pk,&pk_Id2d2,&pk_Id2,&pk_IG2,&pk_Id2G2,&pk_IG2G2,&pk_IFG2,&pk_IFG2_0b1,&pk_IFG2_0,&pk_IFG2_2,&pk_CTR,&pk_CTR_0,&pk_CTR_2,&pk_CTR_4,&pk_Tree,&pk_Tree_0_vv,&pk_Tree_0_vd,&pk_Tree_0_dd,&pk_Tree_2_vv,&pk_Tree_2_vd,&pk_Tree_4_vv,&pk_0_vv,&pk_0_vd,&pk_0_dd,&pk_2_vv,&pk_2_vd,&pk_2_dd,&pk_4_vv,&pk_4_vd,&pk_4_dd,&pk_0_b1b2,&pk_0_b2,&pk_0_b1bG2,&pk_0_bG2,&pk_2_b1b2,&pk_2_b2,&pk_2_b1bG2,&pk_2_bG2,&pk_4_b2,&pk_4_bG2,&pk_4_b1b2,&pk_4_b1bG2,&pk_2_b2b2,&pk_2_b2bG2,&pk_2_bG2bG2,&pk_4_b2b2,&pk_4_b2bG2,&pk_4_bG2bG2) ==_FAILURE_:
                 raise CosmoSevereError(self.sp.error_message)
+        
         result = [pk-5000.]
         result.append(-pk_Id2d2+10000000.)
         result.append(pk_Id2-10.)

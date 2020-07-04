@@ -552,13 +552,72 @@ extern "C" {
                          double * output_tot
                          );
 
-  int spectra_pk_nl_at_z_nocb(
-                           struct background * pba,
-                           struct spectra * psp,
-                           enum linear_or_logarithmic mode,
-                           double z,
-                           double * output_tot
-                           );
+  // int spectra_pk_nl_at_z_nocb(
+  //                          struct background * pba,
+  //                          struct spectra * psp,
+  //                          enum linear_or_logarithmic mode,
+  //                          double z,
+  //                          double * output_tot
+  //                          );
+
+  int spectra_pk_nl_at_k_and_z(
+                               struct background * pba,
+                               struct primordial * ppm,
+                               struct spectra * psp,
+                               struct nonlinear * pnl,
+                               struct nonlinear_pt * pnlpt,
+                               double k,
+                               double z,
+                               double * pk_tot,
+                               double * pk_tot_Id2d2,
+                               double * pk_tot_Id2,
+                               double * pk_tot_IG2,
+                               double * pk_tot_Id2G2,
+                               double * pk_tot_IG2G2,
+                               double * pk_tot_IFG2,
+                               double * pk_tot_IFG2_0b1,
+                               double * pk_tot_IFG2_0,
+                               double * pk_tot_IFG2_2,
+                               double * pk_tot_CTR,
+                               double * pk_tot_CTR_0,
+                               double * pk_tot_CTR_2,
+                               double * pk_tot_CTR_4,
+                               double * pk_tot_Tree,
+                               double * pk_tot_Tree_0_vv,
+                               double * pk_tot_Tree_0_vd,
+                               double * pk_tot_Tree_0_dd,
+                               double * pk_tot_Tree_2_vv,
+                               double * pk_tot_Tree_2_vd,
+                               double * pk_tot_Tree_4_vv,
+                               double * pk_tot_0_vv,
+                               double * pk_tot_0_vd,
+                               double * pk_tot_0_dd,
+                               double * pk_tot_2_vv,
+                               double * pk_tot_2_vd,
+                               double * pk_tot_2_dd,
+                               double * pk_tot_4_vv,
+                               double * pk_tot_4_vd,
+                               double * pk_tot_4_dd,
+                               double * pk_tot_0_b1b2,
+                               double * pk_tot_0_b2,
+                               double * pk_tot_0_b1bG2,
+                               double * pk_tot_0_bG2,
+                               double * pk_tot_2_b1b2,
+                               double * pk_tot_2_b2,
+                               double * pk_tot_2_b1bG2,
+                               double * pk_tot_2_bG2,
+                               double * pk_tot_4_b2,
+                               double * pk_tot_4_bG2,
+                               double * pk_tot_4_b1b2,
+                               double * pk_tot_4_b1bG2,
+                               double * pk_tot_2_b2b2,
+                               double * pk_tot_2_b2bG2,
+                               double * pk_tot_2_bG2bG2,
+                               double * pk_tot_4_b2b2,
+                               double * pk_tot_4_b2bG2,
+                               double * pk_tot_4_bG2bG2
+                               );
+ 
 
   int spectra_pk_nl_bias_at_z_i(
                            struct background * pba,
@@ -616,74 +675,15 @@ extern "C" {
                                   double * output_tot_4_bG2bG2
                                 );
   
-  int spectra_pk_nl_at_k_and_z(
-                               struct background * pba,
-                               struct primordial * ppm,
-                               struct spectra * psp,
-                               double k,
-                               double z,
-                               double * pk_tot,
-                               double * pk_cb_tot
-                               );
-
-  int spectra_pk_nl_at_k_and_z_nocb(
-                               struct background * pba,
-                               struct primordial * ppm,
-                               struct spectra * psp,
-                               struct nonlinear * pnl,
-                               struct nonlinear_pt * pnlpt,
-                               double k,
-                               double z,
-                               double * pk_tot,
-                               double * pk_cb_tot,
-                               double * pk_tot_Id2d2,
-                               double * pk_tot_Id2,
-                               double * pk_tot_IG2,
-                               double * pk_tot_Id2G2,
-                               double * pk_tot_IG2G2,
-                               double * pk_tot_IFG2,
-                               double * pk_tot_IFG2_0b1,
-                               double * pk_tot_IFG2_0,
-                               double * pk_tot_IFG2_2,
-                               double * pk_tot_CTR,
-                               double * pk_tot_CTR_0,
-                               double * pk_tot_CTR_2,
-                               double * pk_tot_CTR_4,
-                               double * pk_tot_Tree,
-                               double * pk_tot_Tree_0_vv,
-                               double * pk_tot_Tree_0_vd,
-                               double * pk_tot_Tree_0_dd,
-                               double * pk_tot_Tree_2_vv,
-                               double * pk_tot_Tree_2_vd,
-                               double * pk_tot_Tree_4_vv,
-                               double * pk_tot_0_vv,
-                               double * pk_tot_0_vd,
-                               double * pk_tot_0_dd,
-                               double * pk_tot_2_vv,
-                               double * pk_tot_2_vd,
-                               double * pk_tot_2_dd,
-                               double * pk_tot_4_vv,
-                               double * pk_tot_4_vd,
-                               double * pk_tot_4_dd,
-                               double * pk_tot_0_b1b2,
-                               double * pk_tot_0_b2,
-                               double * pk_tot_0_b1bG2,
-                               double * pk_tot_0_bG2,
-                               double * pk_tot_2_b1b2,
-                               double * pk_tot_2_b2,
-                               double * pk_tot_2_b1bG2,
-                               double * pk_tot_2_bG2,
-                               double * pk_tot_4_b2,
-                               double * pk_tot_4_bG2,
-                               double * pk_tot_4_b1b2,
-                               double * pk_tot_4_b1bG2,
-                               double * pk_tot_2_b2b2,
-                               double * pk_tot_2_b2bG2,
-                               double * pk_tot_2_bG2bG2,
-                               double * pk_tot_4_b2b2,
-                               double * pk_tot_4_b2bG2,
-                               double * pk_tot_4_bG2bG2
-                               );
+  // int spectra_pk_nl_at_k_and_z(
+  //                              struct background * pba,
+  //                              struct primordial * ppm,
+  //                              struct spectra * psp,
+  //                              double k,
+  //                              double z,
+  //                              double * pk_tot,
+  //                              double * pk_cb_tot
+  //                              );
 
   /*int spectra_pk_nl_halofit_at_k_and_z(
                                  struct background * pba,

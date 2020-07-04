@@ -2220,352 +2220,9 @@ int spectra_pk_at_k_and_z(
  * @return the error status
  */
 
-int spectra_pk_nl_at_z(
-                       struct background * pba,
-                       struct spectra * psp,
-                       enum linear_or_logarithmic mode,
-                       double z,
-                       double * output_tot /* array with argument output_tot[index_k] (must be already allocated) */
-                       ) {
-
-  /** Summary: */
-
-  /** - define local variables */
-    
-  int last_index;
-  int index_k;
-  double tau,ln_tau;
-
-  /** - first step: convert z into ln(tau) */
-
-  class_call(background_tau_of_z(pba,z,&tau),
-             pba->error_message,
-             psp->error_message);
-
-  class_test(tau <= 0.,
-             psp->error_message,
-             "negative or null value of conformal time: cannot interpolate");
-
-  ln_tau = log(tau);
-
-  /** - second step: for both modes (linear or logarithmic), store the spectrum in logarithmic format in the output array(s) */
-
-  /** - --> (a) if only values at tau=tau_today are stored and we want P(k,z=0), no need to interpolate */
-  
-  if (psp->ln_tau_size == 1) {
-
-    class_test(z != 0.,
-               psp->error_message,
-               "asked z=%e but only P(k,z=0) has been tabulated",z);
-
-    for (index_k=0; index_k<psp->ln_k_size; index_k++) {
-      output_tot[index_k] = psp->ln_pk_nl[index_k];
-    }
-  }
-
-  /** - --> (b) if several values of tau have been stored, use interpolation routine to get spectra at correct redshift */
-
-  else {
-
-    class_test(ln_tau < psp->ln_tau[0],
-               "This should never happen",
-               psp->error_message,
-               psp->error_message);
-    
-    if (ln_tau < psp->ln_tau_nl[0]) {
-      
-      class_call(array_interpolate_spline(psp->ln_tau,
-                                          psp->ln_tau_size,
-                                          psp->ln_pk_l,
-                                          psp->ddln_pk_l,
-                                          psp->ln_k_size,
-                                          ln_tau,
-                                          &last_index,
-                                          output_tot,
-                                          psp->ln_k_size,
-                                          psp->error_message),
-                 psp->error_message,
-                 psp->error_message);
-        
-    }
-    else {
-      
-      class_call(array_interpolate_spline(psp->ln_tau_nl,
-                                          psp->ln_tau_nl_size,
-                                          psp->ln_pk_nl,
-                                          psp->ddln_pk_nl,
-                                          psp->ln_k_size,
-                                          ln_tau,
-                                          &last_index,
-                                          output_tot,
-                                          psp->ln_k_size,
-                                          psp->error_message),
-                 psp->error_message,
-                 psp->error_message);
-        
-    }
-  }
-
-  /** - fourth step: eventually convert to linear format */
-
-  if (mode == linear) {
-    for (index_k=0; index_k<psp->ln_k_size; index_k++) {
-      output_tot[index_k] = exp(output_tot[index_k]);
-    }
-  }
-
-  return _SUCCESS_;
-
-}
-
-
-int spectra_pk_nl_bias_at_z_i(
-                              struct background * pba,
-                              struct nonlinear_pt *pnlpt,
-                              struct spectra * psp,
-                              enum linear_or_logarithmic mode,
-                              int i_z, /* number(s) of redshift at which P(k,z) and T_i(k,z) should be written*/
-                              double * output_tot, /* array with argument output_tot[index_k] (must be already allocated) */
-                              double * output_tot_Id2d2,
-                              double * output_tot_Id2,
-                              double * output_tot_IG2,
-                              double * output_tot_Id2G2,
-                              double * output_tot_IG2G2,
-                              double * output_tot_IFG2,
-                              double * output_tot_IFG2_0b1,
-                              double * output_tot_IFG2_0,
-                              double * output_tot_IFG2_2,
-                              double * output_tot_CTR,
-                              double * output_tot_CTR_0,
-                              double * output_tot_CTR_2,
-                              double * output_tot_CTR_4,
-                              double * output_tot_Tree,
-                              double * output_tot_Tree_0_vv,
-                              double * output_tot_Tree_0_vd,
-                              double * output_tot_Tree_0_dd,
-                              double * output_tot_Tree_2_vv,
-                              double * output_tot_Tree_2_vd,
-                              double * output_tot_Tree_4_vv,
-                              double * output_tot_0_vv,
-                              double * output_tot_0_vd,
-                              double * output_tot_0_dd,
-                              double * output_tot_2_vv,
-                              double * output_tot_2_vd,
-                              double * output_tot_2_dd,
-                              double * output_tot_4_vv,
-                              double * output_tot_4_vd,
-                              double * output_tot_4_dd,
-                              double * output_tot_0_b1b2,
-                              double * output_tot_0_b2,
-                              double * output_tot_0_b1bG2,
-                              double * output_tot_0_bG2,
-                              double * output_tot_2_b1b2,
-                              double * output_tot_2_b2,
-                              double * output_tot_2_b1bG2,
-                              double * output_tot_2_bG2,
-                              double * output_tot_4_b2,
-                              double * output_tot_4_bG2,
-                              double * output_tot_4_b1b2,
-                              double * output_tot_4_b1bG2,
-                              double * output_tot_2_b2b2,
-                              double * output_tot_2_b2bG2,
-                              double * output_tot_2_bG2bG2,
-                              double * output_tot_4_b2b2,
-                              double * output_tot_4_b2bG2,
-                              double * output_tot_4_bG2bG2
-                       ) {
-    
-    /** Summary: */
-    
-    /** - define local variables */
-    
-    int last_index;
-    int last_index2;
-    int last_index3;
-    int last_index4;
-    int last_index5;
-    int last_index6;
-    int last_index7;
-    int last_index8;
-    int last_index9;
-    int index_k;
-    double tau,ln_tau;
-    
-    /** - second step: for both modes (linear or logarithmic), store the spectrum in logarithmic format in the output array(s) */
-    
-    /** - --> (a) if only values at tau=tau_today are stored and we want P(k,z=0), no need to interpolate */
-      
-        for (index_k=0; index_k<pnlpt->ln_k_size; index_k++) {
-            output_tot[index_k] = pnlpt->ln_pk_nl[i_z*pnlpt->k_size+index_k];
-            output_tot_Id2d2[index_k] = pnlpt->ln_pk_Id2d2[i_z*pnlpt->k_size+index_k];
-            output_tot_Id2[index_k] = pnlpt->ln_pk_Id2[i_z*pnlpt->k_size+index_k];
-            output_tot_IG2[index_k] = pnlpt->ln_pk_IG2[i_z*pnlpt->k_size+index_k];
-            output_tot_Id2G2[index_k] = pnlpt->ln_pk_Id2G2[i_z*pnlpt->k_size+index_k];
-            output_tot_IG2G2[index_k] = pnlpt->ln_pk_IG2G2[i_z*pnlpt->k_size+index_k];
-            output_tot_IFG2[index_k] = pnlpt->ln_pk_IFG2[i_z*pnlpt->k_size+index_k];
-            output_tot_IFG2_0b1[index_k] = pnlpt->ln_pk_IFG2_0b1[i_z*pnlpt->k_size+index_k];
-            output_tot_IFG2_0[index_k] = pnlpt->ln_pk_IFG2_0[i_z*pnlpt->k_size+index_k];
-            output_tot_IFG2_2[index_k] = pnlpt->ln_pk_IFG2_2[i_z*pnlpt->k_size+index_k];
-            output_tot_CTR[index_k] = pnlpt->ln_pk_CTR[i_z*pnlpt->k_size+index_k];
-            output_tot_CTR_0[index_k] = pnlpt->ln_pk_CTR_0[i_z*pnlpt->k_size+index_k];
-            output_tot_CTR_2[index_k] = pnlpt->ln_pk_CTR_2[i_z*pnlpt->k_size+index_k];
-            output_tot_CTR_4[index_k] = pnlpt->ln_pk_CTR_4[i_z*pnlpt->k_size+index_k];
-            output_tot_Tree[index_k] = pnlpt->ln_pk_Tree[i_z*pnlpt->k_size+index_k];
-            
-            output_tot_Tree_0_vv[index_k] = pnlpt->ln_pk_Tree_0_vv[i_z*pnlpt->k_size+index_k];
-            output_tot_Tree_0_vd[index_k] = pnlpt->ln_pk_Tree_0_vd[i_z*pnlpt->k_size+index_k];
-            output_tot_Tree_0_dd[index_k] = pnlpt->ln_pk_Tree_0_dd[i_z*pnlpt->k_size+index_k];
-            output_tot_Tree_2_vv[index_k] = pnlpt->ln_pk_Tree_2_vv[i_z*pnlpt->k_size+index_k];
-            output_tot_Tree_2_vd[index_k] = pnlpt->ln_pk_Tree_2_vd[i_z*pnlpt->k_size+index_k];
-            output_tot_Tree_4_vv[index_k] = pnlpt->ln_pk_Tree_4_vv[i_z*pnlpt->k_size+index_k];
-            
-            output_tot_0_vv[index_k] = pnlpt->ln_pk_0_vv[i_z*pnlpt->k_size+index_k];
-            output_tot_0_vd[index_k] = pnlpt->ln_pk_0_vd[i_z*pnlpt->k_size+index_k];
-            output_tot_0_dd[index_k] = pnlpt->ln_pk_0_dd[i_z*pnlpt->k_size+index_k];
-            output_tot_2_vv[index_k] = pnlpt->ln_pk_2_vv[i_z*pnlpt->k_size+index_k];
-            output_tot_2_vd[index_k] = pnlpt->ln_pk_2_vd[i_z*pnlpt->k_size+index_k];
-            output_tot_2_dd[index_k] = pnlpt->ln_pk_2_dd[i_z*pnlpt->k_size+index_k];
-            output_tot_4_vv[index_k] = pnlpt->ln_pk_4_vv[i_z*pnlpt->k_size+index_k];
-            output_tot_4_vd[index_k] = pnlpt->ln_pk_4_vd[i_z*pnlpt->k_size+index_k];
-            output_tot_4_dd[index_k] = pnlpt->ln_pk_4_dd[i_z*pnlpt->k_size+index_k];
-            output_tot_0_b1b2[index_k] = pnlpt->ln_pk_0_b1b2[i_z*pnlpt->k_size+index_k];
-            output_tot_0_b1bG2[index_k] = pnlpt->ln_pk_0_b1bG2[i_z*pnlpt->k_size+index_k];
-            output_tot_0_b2[index_k] = pnlpt->ln_pk_0_b2[i_z*pnlpt->k_size+index_k];
-            output_tot_0_bG2[index_k] = pnlpt->ln_pk_0_bG2[i_z*pnlpt->k_size+index_k];
-            
-            output_tot_2_b1b2[index_k] = pnlpt->ln_pk_2_b1b2[i_z*pnlpt->k_size+index_k];
-            output_tot_2_b1bG2[index_k] = pnlpt->ln_pk_2_b1bG2[i_z*pnlpt->k_size+index_k];
-            output_tot_2_b2[index_k] = pnlpt->ln_pk_2_b2[i_z*pnlpt->k_size+index_k];
-            output_tot_2_bG2[index_k] = pnlpt->ln_pk_2_bG2[i_z*pnlpt->k_size+index_k];
-            
-            output_tot_4_b2[index_k] = pnlpt->ln_pk_4_b2[i_z*pnlpt->k_size+index_k];
-            output_tot_4_bG2[index_k] = pnlpt->ln_pk_4_bG2[i_z*pnlpt->k_size+index_k];
-            
-            output_tot_4_b1b2[index_k] = pnlpt->ln_pk_4_b1b2[i_z*pnlpt->k_size+index_k];
-            output_tot_4_b1bG2[index_k] = pnlpt->ln_pk_4_b1bG2[i_z*pnlpt->k_size+index_k];
-            
-            output_tot_2_b2b2[index_k] = pnlpt->ln_pk_Id2d2_2[i_z*pnlpt->k_size+index_k];
-            output_tot_2_b2bG2[index_k] = pnlpt->ln_pk_Id2G2_2[i_z*pnlpt->k_size+index_k];
-            output_tot_2_bG2bG2[index_k] = pnlpt->ln_pk_IG2G2_2[i_z*pnlpt->k_size+index_k];
-            
-            output_tot_4_b2b2[index_k] = pnlpt->ln_pk_Id2d2_4[i_z*pnlpt->k_size+index_k];
-            output_tot_4_b2bG2[index_k] = pnlpt->ln_pk_Id2G2_4[i_z*pnlpt->k_size+index_k];
-            output_tot_4_bG2bG2[index_k] = pnlpt->ln_pk_IG2G2_4[i_z*pnlpt->k_size+index_k];
-
-            
-        }
-
-    /** - fourth step: eventually convert to linear format */
-    
-    if (mode == linear) {
-        for (index_k=0; index_k<pnlpt->ln_k_size; index_k++) {
-            output_tot[index_k] = exp(output_tot[index_k]);
-            output_tot_Id2d2[index_k] = exp(output_tot_Id2d2[index_k]);
-            output_tot_Id2[index_k] = exp(output_tot_Id2[index_k]);
-            output_tot_IG2[index_k] = exp(output_tot_IG2[index_k]);
-            output_tot_Id2G2[index_k] = exp(output_tot_Id2G2[index_k]);
-            output_tot_IG2G2[index_k] = exp(output_tot_IG2G2[index_k]);
-            output_tot_IFG2[index_k] = exp(output_tot_IFG2[index_k]);
-            output_tot_IFG2_0b1[index_k] = exp(output_tot_IFG2_0b1[index_k]);
-            output_tot_IFG2_0[index_k] = exp(output_tot_IFG2_0[index_k]);
-            output_tot_IFG2_2[index_k] = exp(output_tot_IFG2_2[index_k]);
-            output_tot_CTR[index_k] = exp(output_tot_CTR[index_k]);
-            output_tot_CTR_0[index_k] = exp(output_tot_CTR_0[index_k]);
-            output_tot_CTR_2[index_k] = exp(output_tot_CTR_2[index_k]);
-            output_tot_CTR_4[index_k] = exp(output_tot_CTR_4[index_k]);
-            output_tot_Tree[index_k] = exp(output_tot_Tree[index_k]);
-            output_tot_Tree_0_vv[index_k] = exp(output_tot_Tree_0_vv[index_k]);
-            output_tot_Tree_0_vd[index_k] = exp(output_tot_Tree_0_vd[index_k]);
-            output_tot_Tree_0_dd[index_k] = exp(output_tot_Tree_0_dd[index_k]);
-            output_tot_Tree_2_vv[index_k] = exp(output_tot_Tree_2_vv[index_k]);
-            output_tot_Tree_2_vd[index_k] = exp(output_tot_Tree_2_vd[index_k]);
-            output_tot_Tree_4_vv[index_k] = exp(output_tot_Tree_4_vv[index_k]);
-            output_tot_0_vv[index_k] = exp(output_tot_0_vv[index_k]);
-            output_tot_0_vd[index_k] = exp(output_tot_0_vd[index_k]);
-            output_tot_0_dd[index_k] = exp(output_tot_0_dd[index_k]);
-            output_tot_2_vv[index_k] = exp(output_tot_2_vv[index_k]);
-            output_tot_2_vd[index_k] = exp(output_tot_2_vd[index_k]);
-            output_tot_2_dd[index_k] = exp(output_tot_2_dd[index_k]);
-            output_tot_4_vv[index_k] = exp(output_tot_4_vv[index_k]);
-            output_tot_4_vd[index_k] = exp(output_tot_4_vd[index_k]);
-            output_tot_4_dd[index_k] = exp(output_tot_4_dd[index_k]);
-            output_tot_0_b1b2[index_k] = exp(output_tot_0_b1b2[index_k]);
-            output_tot_0_b1bG2[index_k] = exp(output_tot_0_b1bG2[index_k]);
-            output_tot_0_b2[index_k] = exp(output_tot_0_b2[index_k]);
-            output_tot_0_bG2[index_k] = exp(output_tot_0_bG2[index_k]);
-            
-            output_tot_2_b1b2[index_k] = exp(output_tot_2_b1b2[index_k]);
-            output_tot_2_b1bG2[index_k] = exp(output_tot_2_b1bG2[index_k]);
-            output_tot_2_b2[index_k] = exp(output_tot_2_b2[index_k]);
-            output_tot_2_bG2[index_k] = exp(output_tot_2_bG2[index_k]);
-            
-            output_tot_4_b2[index_k] = exp(output_tot_4_b2[index_k]);
-            output_tot_4_bG2[index_k] = exp(output_tot_4_bG2[index_k]);
-            output_tot_4_b1b2[index_k] = exp(output_tot_4_b1b2[index_k]);
-            output_tot_4_b1bG2[index_k] = exp(output_tot_4_b1bG2[index_k]);
-            
-            output_tot_2_b2b2[index_k] = exp(output_tot_2_b2b2[index_k]);
-            output_tot_2_b2bG2[index_k] = exp(output_tot_2_b2bG2[index_k]);
-            output_tot_2_bG2bG2[index_k] = exp(output_tot_2_bG2bG2[index_k]);
-            
-            output_tot_4_b2b2[index_k] = exp(output_tot_4_b2b2[index_k]);
-            output_tot_4_b2bG2[index_k] = exp(output_tot_4_b2bG2[index_k]);
-            output_tot_4_bG2bG2[index_k] = exp(output_tot_4_bG2bG2[index_k]);
-
-        }
-    }
-    
-    return _SUCCESS_;
-    
-}
-
-
-/**
- * Non-linear total matter power spectrum for arbitrary wavenumber and redshift.
- *
- * This function is deprecated since v2.8. Try using nonlinear_pk_at_k_and_z() instead.
- *
- * @param pba        Input: pointer to background structure (used for converting z into tau)
- * @param ppm        Input: pointer to primordial structure (used only in the case 0 < k < kmin)
- * @param psp        Input: pointer to spectra structure (containing pre-computed table)
- * @param k          Input: wavenumber in 1/Mpc
- * @param z          Input: redshift
- * @param pk_tot     Output: total matter power spectrum P(k) in \f$ Mpc^3\f$
- * @param pk_cb_tot  Output: b+CDM power spectrum P(k) in \f$ Mpc^3\f$
- * @return the error status
- */
+// This routing is used in the python wrapper
 
 int spectra_pk_nl_at_k_and_z(
-                             struct background * pba,
-                             struct primordial * ppm,
-                             struct spectra * psp,
-                             double k,
-                             double z,
-                             double * pk_tot,   /* pointer to a single number (must be already allocated) */
-                             double * pk_cb_tot /* same as pk_tot for baryon+CDM only */
-                             ) {
-
-  fprintf(stderr," -> [WARNING:] You are calling the function spectra_pk_nl_at_k_and_z() which is deprecated since v2.8. Try using nonlinear_pk_at_k_and_z() instead.\n");
-
-  class_call(nonlinear_pks_at_k_and_z(pba,
-                                      ppm,
-                                      psp->pnl,
-                                      pk_nonlinear,
-                                      k,
-                                      z,
-                                      pk_tot,
-                                      NULL,
-                                      pk_cb_tot,
-                                      NULL
-                                      ),
-             psp->pnl->error_message,
-             psp->error_message);
-
-  return _SUCCESS_;
-
-}
-
-int spectra_pk_nl_at_k_and_z_nocb(
                              struct background * pba,
                              struct primordial * ppm,
                              struct spectra * psp,
@@ -2573,8 +2230,7 @@ int spectra_pk_nl_at_k_and_z_nocb(
                              struct nonlinear_pt * pnlpt,
                              double k,
                              double z,
-                             double * pk_tot,   /* pointer to a single number (must be already allocated) */
-                             double * pk_cb_tot, /* same as pk_tot for baryon+CDM only */
+                             double * pk_tot, /* pointer to a single number (must be already allocated) */
                              double * pk_tot_Id2d2,
                              double * pk_tot_Id2,
                              double * pk_tot_IG2,
@@ -2929,22 +2585,13 @@ int spectra_pk_nl_at_k_and_z_nocb(
     
 
     if (pnlpt->method == nlpt_none && pnl->method != nl_none){
-    fprintf(stderr," -> [WARNING:] You are calling the function spectra_pk_nl_at_k_and_z() which is deprecated since v2.8. Try using nonlinear_pk_at_k_and_z() instead.\n");
-
-    class_call(nonlinear_pks_at_k_and_z(pba,
-                                      ppm,
-                                      psp->pnl,
-                                      pk_nonlinear,
-                                      k,
-                                      z,
-                                      pk_tot,
-                                      NULL,
-                                      pk_cb_tot,
-                                      NULL
-                                      ),
-             psp->pnl->error_message,
+    class_call(spectra_pk_nl_at_z(pba,
+                                psp,
+                                logarithmic,
+                                z,
+                                spectrum_at_z),
+             psp->error_message,
              psp->error_message);
-
     }
 
 /*Correspondance between requested redshift z and number of value in z_pk input*/
@@ -4404,6 +4051,370 @@ for (i_z=0; i_z<pnlpt->z_pk_num; i_z++) {
 
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+int spectra_pk_nl_at_z(
+                       struct background * pba,
+                       struct spectra * psp,
+                       enum linear_or_logarithmic mode,
+                       double z,
+                       double * output_tot /* array with argument output_tot[index_k] (must be already allocated) */
+                       ) {
+
+  /** Summary: */
+
+  /** - define local variables */
+    
+  int last_index;
+  int index_k;
+  double tau,ln_tau;
+
+  /** - first step: convert z into ln(tau) */
+
+  class_call(background_tau_of_z(pba,z,&tau),
+             pba->error_message,
+             psp->error_message);
+
+  class_test(tau <= 0.,
+             psp->error_message,
+             "negative or null value of conformal time: cannot interpolate");
+
+  ln_tau = log(tau);
+
+  /** - second step: for both modes (linear or logarithmic), store the spectrum in logarithmic format in the output array(s) */
+
+  /** - --> (a) if only values at tau=tau_today are stored and we want P(k,z=0), no need to interpolate */
+  
+  if (psp->ln_tau_size == 1) {
+
+    class_test(z != 0.,
+               psp->error_message,
+               "asked z=%e but only P(k,z=0) has been tabulated",z);
+
+    for (index_k=0; index_k<psp->ln_k_size; index_k++) {
+      output_tot[index_k] = psp->ln_pk_nl[index_k];
+    }
+  }
+
+  /** - --> (b) if several values of tau have been stored, use interpolation routine to get spectra at correct redshift */
+
+  else {
+
+    class_test(ln_tau < psp->ln_tau[0],
+               "This should never happen",
+               psp->error_message,
+               psp->error_message);
+    
+    if (ln_tau < psp->ln_tau_nl[0]) {
+      
+      class_call(array_interpolate_spline(psp->ln_tau,
+                                          psp->ln_tau_size,
+                                          psp->ln_pk_l,
+                                          psp->ddln_pk_l,
+                                          psp->ln_k_size,
+                                          ln_tau,
+                                          &last_index,
+                                          output_tot,
+                                          psp->ln_k_size,
+                                          psp->error_message),
+                 psp->error_message,
+                 psp->error_message);
+        
+    }
+    else {
+      
+      class_call(array_interpolate_spline(psp->ln_tau_nl,
+                                          psp->ln_tau_nl_size,
+                                          psp->ln_pk_nl,
+                                          psp->ddln_pk_nl,
+                                          psp->ln_k_size,
+                                          ln_tau,
+                                          &last_index,
+                                          output_tot,
+                                          psp->ln_k_size,
+                                          psp->error_message),
+                 psp->error_message,
+                 psp->error_message);
+        
+    }
+  }
+
+  /** - fourth step: eventually convert to linear format */
+
+  if (mode == linear) {
+    for (index_k=0; index_k<psp->ln_k_size; index_k++) {
+      output_tot[index_k] = exp(output_tot[index_k]);
+    }
+  }
+
+  return _SUCCESS_;
+
+}
+
+
+int spectra_pk_nl_bias_at_z_i(
+                              struct background * pba,
+                              struct nonlinear_pt *pnlpt,
+                              struct spectra * psp,
+                              enum linear_or_logarithmic mode,
+                              int i_z, /* number(s) of redshift at which P(k,z) and T_i(k,z) should be written*/
+                              double * output_tot, /* array with argument output_tot[index_k] (must be already allocated) */
+                              double * output_tot_Id2d2,
+                              double * output_tot_Id2,
+                              double * output_tot_IG2,
+                              double * output_tot_Id2G2,
+                              double * output_tot_IG2G2,
+                              double * output_tot_IFG2,
+                              double * output_tot_IFG2_0b1,
+                              double * output_tot_IFG2_0,
+                              double * output_tot_IFG2_2,
+                              double * output_tot_CTR,
+                              double * output_tot_CTR_0,
+                              double * output_tot_CTR_2,
+                              double * output_tot_CTR_4,
+                              double * output_tot_Tree,
+                              double * output_tot_Tree_0_vv,
+                              double * output_tot_Tree_0_vd,
+                              double * output_tot_Tree_0_dd,
+                              double * output_tot_Tree_2_vv,
+                              double * output_tot_Tree_2_vd,
+                              double * output_tot_Tree_4_vv,
+                              double * output_tot_0_vv,
+                              double * output_tot_0_vd,
+                              double * output_tot_0_dd,
+                              double * output_tot_2_vv,
+                              double * output_tot_2_vd,
+                              double * output_tot_2_dd,
+                              double * output_tot_4_vv,
+                              double * output_tot_4_vd,
+                              double * output_tot_4_dd,
+                              double * output_tot_0_b1b2,
+                              double * output_tot_0_b2,
+                              double * output_tot_0_b1bG2,
+                              double * output_tot_0_bG2,
+                              double * output_tot_2_b1b2,
+                              double * output_tot_2_b2,
+                              double * output_tot_2_b1bG2,
+                              double * output_tot_2_bG2,
+                              double * output_tot_4_b2,
+                              double * output_tot_4_bG2,
+                              double * output_tot_4_b1b2,
+                              double * output_tot_4_b1bG2,
+                              double * output_tot_2_b2b2,
+                              double * output_tot_2_b2bG2,
+                              double * output_tot_2_bG2bG2,
+                              double * output_tot_4_b2b2,
+                              double * output_tot_4_b2bG2,
+                              double * output_tot_4_bG2bG2
+                       ) {
+    
+    /** Summary: */
+    
+    /** - define local variables */
+    
+    int last_index;
+    int last_index2;
+    int last_index3;
+    int last_index4;
+    int last_index5;
+    int last_index6;
+    int last_index7;
+    int last_index8;
+    int last_index9;
+    int index_k;
+    double tau,ln_tau;
+    
+    /** - second step: for both modes (linear or logarithmic), store the spectrum in logarithmic format in the output array(s) */
+    
+    /** - --> (a) if only values at tau=tau_today are stored and we want P(k,z=0), no need to interpolate */
+      
+        for (index_k=0; index_k<pnlpt->ln_k_size; index_k++) {
+            output_tot[index_k] = pnlpt->ln_pk_nl[i_z*pnlpt->k_size+index_k];
+            output_tot_Id2d2[index_k] = pnlpt->ln_pk_Id2d2[i_z*pnlpt->k_size+index_k];
+            output_tot_Id2[index_k] = pnlpt->ln_pk_Id2[i_z*pnlpt->k_size+index_k];
+            output_tot_IG2[index_k] = pnlpt->ln_pk_IG2[i_z*pnlpt->k_size+index_k];
+            output_tot_Id2G2[index_k] = pnlpt->ln_pk_Id2G2[i_z*pnlpt->k_size+index_k];
+            output_tot_IG2G2[index_k] = pnlpt->ln_pk_IG2G2[i_z*pnlpt->k_size+index_k];
+            output_tot_IFG2[index_k] = pnlpt->ln_pk_IFG2[i_z*pnlpt->k_size+index_k];
+            output_tot_IFG2_0b1[index_k] = pnlpt->ln_pk_IFG2_0b1[i_z*pnlpt->k_size+index_k];
+            output_tot_IFG2_0[index_k] = pnlpt->ln_pk_IFG2_0[i_z*pnlpt->k_size+index_k];
+            output_tot_IFG2_2[index_k] = pnlpt->ln_pk_IFG2_2[i_z*pnlpt->k_size+index_k];
+            output_tot_CTR[index_k] = pnlpt->ln_pk_CTR[i_z*pnlpt->k_size+index_k];
+            output_tot_CTR_0[index_k] = pnlpt->ln_pk_CTR_0[i_z*pnlpt->k_size+index_k];
+            output_tot_CTR_2[index_k] = pnlpt->ln_pk_CTR_2[i_z*pnlpt->k_size+index_k];
+            output_tot_CTR_4[index_k] = pnlpt->ln_pk_CTR_4[i_z*pnlpt->k_size+index_k];
+            output_tot_Tree[index_k] = pnlpt->ln_pk_Tree[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_Tree_0_vv[index_k] = pnlpt->ln_pk_Tree_0_vv[i_z*pnlpt->k_size+index_k];
+            output_tot_Tree_0_vd[index_k] = pnlpt->ln_pk_Tree_0_vd[i_z*pnlpt->k_size+index_k];
+            output_tot_Tree_0_dd[index_k] = pnlpt->ln_pk_Tree_0_dd[i_z*pnlpt->k_size+index_k];
+            output_tot_Tree_2_vv[index_k] = pnlpt->ln_pk_Tree_2_vv[i_z*pnlpt->k_size+index_k];
+            output_tot_Tree_2_vd[index_k] = pnlpt->ln_pk_Tree_2_vd[i_z*pnlpt->k_size+index_k];
+            output_tot_Tree_4_vv[index_k] = pnlpt->ln_pk_Tree_4_vv[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_0_vv[index_k] = pnlpt->ln_pk_0_vv[i_z*pnlpt->k_size+index_k];
+            output_tot_0_vd[index_k] = pnlpt->ln_pk_0_vd[i_z*pnlpt->k_size+index_k];
+            output_tot_0_dd[index_k] = pnlpt->ln_pk_0_dd[i_z*pnlpt->k_size+index_k];
+            output_tot_2_vv[index_k] = pnlpt->ln_pk_2_vv[i_z*pnlpt->k_size+index_k];
+            output_tot_2_vd[index_k] = pnlpt->ln_pk_2_vd[i_z*pnlpt->k_size+index_k];
+            output_tot_2_dd[index_k] = pnlpt->ln_pk_2_dd[i_z*pnlpt->k_size+index_k];
+            output_tot_4_vv[index_k] = pnlpt->ln_pk_4_vv[i_z*pnlpt->k_size+index_k];
+            output_tot_4_vd[index_k] = pnlpt->ln_pk_4_vd[i_z*pnlpt->k_size+index_k];
+            output_tot_4_dd[index_k] = pnlpt->ln_pk_4_dd[i_z*pnlpt->k_size+index_k];
+            output_tot_0_b1b2[index_k] = pnlpt->ln_pk_0_b1b2[i_z*pnlpt->k_size+index_k];
+            output_tot_0_b1bG2[index_k] = pnlpt->ln_pk_0_b1bG2[i_z*pnlpt->k_size+index_k];
+            output_tot_0_b2[index_k] = pnlpt->ln_pk_0_b2[i_z*pnlpt->k_size+index_k];
+            output_tot_0_bG2[index_k] = pnlpt->ln_pk_0_bG2[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_2_b1b2[index_k] = pnlpt->ln_pk_2_b1b2[i_z*pnlpt->k_size+index_k];
+            output_tot_2_b1bG2[index_k] = pnlpt->ln_pk_2_b1bG2[i_z*pnlpt->k_size+index_k];
+            output_tot_2_b2[index_k] = pnlpt->ln_pk_2_b2[i_z*pnlpt->k_size+index_k];
+            output_tot_2_bG2[index_k] = pnlpt->ln_pk_2_bG2[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_4_b2[index_k] = pnlpt->ln_pk_4_b2[i_z*pnlpt->k_size+index_k];
+            output_tot_4_bG2[index_k] = pnlpt->ln_pk_4_bG2[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_4_b1b2[index_k] = pnlpt->ln_pk_4_b1b2[i_z*pnlpt->k_size+index_k];
+            output_tot_4_b1bG2[index_k] = pnlpt->ln_pk_4_b1bG2[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_2_b2b2[index_k] = pnlpt->ln_pk_Id2d2_2[i_z*pnlpt->k_size+index_k];
+            output_tot_2_b2bG2[index_k] = pnlpt->ln_pk_Id2G2_2[i_z*pnlpt->k_size+index_k];
+            output_tot_2_bG2bG2[index_k] = pnlpt->ln_pk_IG2G2_2[i_z*pnlpt->k_size+index_k];
+            
+            output_tot_4_b2b2[index_k] = pnlpt->ln_pk_Id2d2_4[i_z*pnlpt->k_size+index_k];
+            output_tot_4_b2bG2[index_k] = pnlpt->ln_pk_Id2G2_4[i_z*pnlpt->k_size+index_k];
+            output_tot_4_bG2bG2[index_k] = pnlpt->ln_pk_IG2G2_4[i_z*pnlpt->k_size+index_k];
+
+            
+        }
+
+    /** - fourth step: eventually convert to linear format */
+    
+    if (mode == linear) {
+        for (index_k=0; index_k<pnlpt->ln_k_size; index_k++) {
+            output_tot[index_k] = exp(output_tot[index_k]);
+            output_tot_Id2d2[index_k] = exp(output_tot_Id2d2[index_k]);
+            output_tot_Id2[index_k] = exp(output_tot_Id2[index_k]);
+            output_tot_IG2[index_k] = exp(output_tot_IG2[index_k]);
+            output_tot_Id2G2[index_k] = exp(output_tot_Id2G2[index_k]);
+            output_tot_IG2G2[index_k] = exp(output_tot_IG2G2[index_k]);
+            output_tot_IFG2[index_k] = exp(output_tot_IFG2[index_k]);
+            output_tot_IFG2_0b1[index_k] = exp(output_tot_IFG2_0b1[index_k]);
+            output_tot_IFG2_0[index_k] = exp(output_tot_IFG2_0[index_k]);
+            output_tot_IFG2_2[index_k] = exp(output_tot_IFG2_2[index_k]);
+            output_tot_CTR[index_k] = exp(output_tot_CTR[index_k]);
+            output_tot_CTR_0[index_k] = exp(output_tot_CTR_0[index_k]);
+            output_tot_CTR_2[index_k] = exp(output_tot_CTR_2[index_k]);
+            output_tot_CTR_4[index_k] = exp(output_tot_CTR_4[index_k]);
+            output_tot_Tree[index_k] = exp(output_tot_Tree[index_k]);
+            output_tot_Tree_0_vv[index_k] = exp(output_tot_Tree_0_vv[index_k]);
+            output_tot_Tree_0_vd[index_k] = exp(output_tot_Tree_0_vd[index_k]);
+            output_tot_Tree_0_dd[index_k] = exp(output_tot_Tree_0_dd[index_k]);
+            output_tot_Tree_2_vv[index_k] = exp(output_tot_Tree_2_vv[index_k]);
+            output_tot_Tree_2_vd[index_k] = exp(output_tot_Tree_2_vd[index_k]);
+            output_tot_Tree_4_vv[index_k] = exp(output_tot_Tree_4_vv[index_k]);
+            output_tot_0_vv[index_k] = exp(output_tot_0_vv[index_k]);
+            output_tot_0_vd[index_k] = exp(output_tot_0_vd[index_k]);
+            output_tot_0_dd[index_k] = exp(output_tot_0_dd[index_k]);
+            output_tot_2_vv[index_k] = exp(output_tot_2_vv[index_k]);
+            output_tot_2_vd[index_k] = exp(output_tot_2_vd[index_k]);
+            output_tot_2_dd[index_k] = exp(output_tot_2_dd[index_k]);
+            output_tot_4_vv[index_k] = exp(output_tot_4_vv[index_k]);
+            output_tot_4_vd[index_k] = exp(output_tot_4_vd[index_k]);
+            output_tot_4_dd[index_k] = exp(output_tot_4_dd[index_k]);
+            output_tot_0_b1b2[index_k] = exp(output_tot_0_b1b2[index_k]);
+            output_tot_0_b1bG2[index_k] = exp(output_tot_0_b1bG2[index_k]);
+            output_tot_0_b2[index_k] = exp(output_tot_0_b2[index_k]);
+            output_tot_0_bG2[index_k] = exp(output_tot_0_bG2[index_k]);
+            
+            output_tot_2_b1b2[index_k] = exp(output_tot_2_b1b2[index_k]);
+            output_tot_2_b1bG2[index_k] = exp(output_tot_2_b1bG2[index_k]);
+            output_tot_2_b2[index_k] = exp(output_tot_2_b2[index_k]);
+            output_tot_2_bG2[index_k] = exp(output_tot_2_bG2[index_k]);
+            
+            output_tot_4_b2[index_k] = exp(output_tot_4_b2[index_k]);
+            output_tot_4_bG2[index_k] = exp(output_tot_4_bG2[index_k]);
+            output_tot_4_b1b2[index_k] = exp(output_tot_4_b1b2[index_k]);
+            output_tot_4_b1bG2[index_k] = exp(output_tot_4_b1bG2[index_k]);
+            
+            output_tot_2_b2b2[index_k] = exp(output_tot_2_b2b2[index_k]);
+            output_tot_2_b2bG2[index_k] = exp(output_tot_2_b2bG2[index_k]);
+            output_tot_2_bG2bG2[index_k] = exp(output_tot_2_bG2bG2[index_k]);
+            
+            output_tot_4_b2b2[index_k] = exp(output_tot_4_b2b2[index_k]);
+            output_tot_4_b2bG2[index_k] = exp(output_tot_4_b2bG2[index_k]);
+            output_tot_4_bG2bG2[index_k] = exp(output_tot_4_bG2bG2[index_k]);
+
+        }
+    }
+    
+    return _SUCCESS_;
+    
+}
+
+
+/**
+ * Non-linear total matter power spectrum for arbitrary wavenumber and redshift.
+ *
+ * This function is deprecated since v2.8. Try using nonlinear_pk_at_k_and_z() instead.
+ *
+ * @param pba        Input: pointer to background structure (used for converting z into tau)
+ * @param ppm        Input: pointer to primordial structure (used only in the case 0 < k < kmin)
+ * @param psp        Input: pointer to spectra structure (containing pre-computed table)
+ * @param k          Input: wavenumber in 1/Mpc
+ * @param z          Input: redshift
+ * @param pk_tot     Output: total matter power spectrum P(k) in \f$ Mpc^3\f$
+ * @param pk_cb_tot  Output: b+CDM power spectrum P(k) in \f$ Mpc^3\f$
+ * @return the error status
+ */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /**
  * Return the P(k,z) for a grid of (k_i,z_j) passed in input,
  * for all available pk types (_m, _cb),
@@ -4663,7 +4674,7 @@ int spectra_pk_nl_halofit_at_k_and_z(
 //                 psp->ln_k_size*sizeof(double),
 //                 psp->error_message);
     
-//     class_call(spectra_pk_nl_at_z_nocb(pba,
+//     class_call(spectra_pk_nl_at_z(pba,
 //                                   psp,
 //                                   logarithmic,
 //                                   z,
