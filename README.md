@@ -13,7 +13,7 @@ FEATURES:
 5) Inclusion of the pt_matrices folder
 6) Consistent changes in the python wrapper (setup.py, classy.c, classy.pyx, cclassy.pxd)
 7) Inclusion of the module fft (.c and .h)
-
+8) Inclusion of the paths to OPENBLAS in Makefile and python wrapper
 
 REFERENCES:
 
