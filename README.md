@@ -1,7 +1,7 @@
 # AxiCLASS-PT
 
 EFTofLSS non-linear predictions in EDE models 
-(a merger of https://github.com/PoulinV/AxiCLASS and https://github.com/Michalychforever/CLASS-PT, to be interfaced with lss_montepython https://github.com/Michalychforever/lss_montepython for LSS analyses) 
+(a merger of https://github.com/PoulinV/AxiCLASS and https://github.com/Michalychforever/CLASS-PT, to be interfaced with https://github.com/Michalychforever/lss_montepython for LSS analyses) 
 
 
 FEATURES:
